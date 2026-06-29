@@ -1,0 +1,29 @@
+# ============================================================
+# NX-LAM API (NestJS) — production image for Coolify / docker compose.
+# Build context = repo root.  Build:  docker build -f deploy/Dockerfile.api -t nx-lam-api .
+# ============================================================
+FROM node:20-alpine AS base
+RUN corepack enable && apk add --no-cache openssl libc6-compat
+WORKDIR /app
+
+# ---- build: cache the install layer (manifests first), then build shared → prisma → api ----
+FROM base AS build
+COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+COPY packages/shared/package.json packages/shared/
+RUN pnpm install --frozen-lockfile
+COPY . .
+RUN pnpm --filter @nx-lam/shared build \
+ && pnpm --filter api run prisma:generate:ci \
+ && pnpm --filter api build
+
+# ---- runner: carry the whole built workspace (keeps pnpm symlinks + prisma engine intact) ----
+FROM base AS runner
+ENV NODE_ENV=production
+COPY --from=build /app /app
+EXPOSE 3001
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://127.0.0.1:'+(process.env.API_PORT||3001)+'/api',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))"
+# Apply pending migrations, then boot the API (migrations are idempotent & safe to re-run).
+CMD ["sh", "-c", "pnpm --filter api run prisma:deploy:ci && node apps/api/dist/src/main.js"]

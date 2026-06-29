@@ -1,0 +1,23 @@
+# Postgres للـ dev. شغّل: docker compose up -d
+# المنفذ على المضيف 5435 (5432 مشغول بنسخة Postgres أخرى على الجهاز).
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: nx_lam_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: fleet_assets
+    ports:
+      - "5435:5432"
+    volumes:
+      - fleet_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fleet_assets"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  fleet_pg_data:

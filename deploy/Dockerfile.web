@@ -1,0 +1,27 @@
+# ============================================================
+# NX-LAM Web (React/Vite) — built then served by nginx.
+# The SPA calls the API via the relative path /api, which nginx proxies to the
+# API service (see deploy/nginx.conf.template, host configurable via API_UPSTREAM).
+# Build context = repo root.  Build:  docker build -f deploy/Dockerfile.web -t nx-lam-web .
+# ============================================================
+FROM node:20-alpine AS build
+RUN corepack enable
+WORKDIR /app
+# Cache the install layer (manifests first); source-only edits won't re-install.
+COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
+COPY apps/api/package.json apps/api/
+COPY apps/web/package.json apps/web/
+COPY packages/shared/package.json packages/shared/
+RUN pnpm install --frozen-lockfile
+COPY . .
+# shared must be built first: the web's `tsc -b` resolves @nx-lam/shared types from its dist
+# (the Vite alias only covers bundling, not type-checking).
+RUN pnpm --filter @nx-lam/shared build \
+ && pnpm --filter web build
+
+FROM nginx:alpine
+# Template is rendered by nginx's entrypoint (envsubst) using API_UPSTREAM.
+ENV API_UPSTREAM=http://api:3001
+COPY deploy/nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY --from=build /app/apps/web/dist /usr/share/nginx/html
+EXPOSE 80

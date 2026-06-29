@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Warm cream canvas + teal/emerald brand + light sidebar (IBP design language) */
+    --background: 40 33% 98%;
+    --foreground: 215 30% 17%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 30% 17%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 30% 17%;
+    --primary: 168 76% 36%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 40 22% 95%;
+    --secondary-foreground: 215 30% 17%;
+    --muted: 40 22% 95%;
+    --muted-foreground: 220 10% 46%;
+    --accent: 168 52% 93%;
+    --accent-foreground: 170 80% 22%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 160 75% 38%;
+    --success-foreground: 0 0% 100%;
+    --warning: 35 92% 52%;
+    --warning-foreground: 0 0% 100%;
+    --border: 36 18% 90%;
+    --input: 36 18% 90%;
+    --ring: 168 76% 36%;
+    --radius: 1rem;
+
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 215 28% 22%;
+    --sidebar-muted: 220 9% 50%;
+    --sidebar-accent: 40 22% 95%;
+  }
+
+  .dark {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 10%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 10%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 168 70% 42%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 170 40% 20%;
+    --accent-foreground: 168 60% 85%;
+    --destructive: 0 63% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 160 65% 42%;
+    --success-foreground: 0 0% 100%;
+    --warning: 35 92% 52%;
+    --warning-foreground: 222 47% 11%;
+    --border: 217 33% 20%;
+    --input: 217 33% 22%;
+    --ring: 168 70% 42%;
+
+    --sidebar: 222 47% 9%;
+    --sidebar-foreground: 210 40% 96%;
+    --sidebar-muted: 215 20% 55%;
+    --sidebar-accent: 217 33% 17%;
+  }
+
+  * {
+    @apply border-border;
+  }
+  html, body, #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+  [dir='rtl'] body {
+    @apply font-ar;
+  }
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { @apply bg-border rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-muted-foreground/40; }
+}
+
+@layer components {
+  /* Aurora / spotlight background used on the login screen */
+  .aurora-bg {
+    background-color: hsl(190 60% 6%);
+    background-image:
+      radial-gradient(40% 50% at 20% 20%, hsl(168 76% 42% / 0.45), transparent 70%),
+      radial-gradient(40% 50% at 80% 30%, hsl(190 80% 45% / 0.40), transparent 70%),
+      radial-gradient(45% 55% at 60% 90%, hsl(150 70% 45% / 0.35), transparent 70%);
+    background-size: 200% 200%;
+  }
+  /* Subtle dotted grid overlay */
+  .grid-bg {
+    background-image: radial-gradient(hsl(215 20% 65% / 0.25) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  .glass {
+    @apply bg-card/80 backdrop-blur-xl border border-white/10;
+  }
+}

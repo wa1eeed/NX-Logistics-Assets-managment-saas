@@ -1,0 +1,60 @@
+{
+  "name": "api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "nest start --watch",
+    "start": "node dist/src/main.js",
+    "start:prod": "node dist/src/main.js",
+    "build": "nest build",
+    "test": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_PROJECT=tsconfig.json dotenv -e ../../.env -- node -r ts-node/register --test test/entitlements.isolation.test.ts",
+    "prisma:generate": "dotenv -e ../../.env -- prisma generate --schema ../../prisma/schema.prisma",
+    "prisma:migrate": "dotenv -e ../../.env -- prisma migrate dev --schema ../../prisma/schema.prisma",
+    "prisma:deploy": "dotenv -e ../../.env -- prisma migrate deploy --schema ../../prisma/schema.prisma",
+    "prisma:generate:ci": "prisma generate --schema ../../prisma/schema.prisma",
+    "prisma:deploy:ci": "prisma migrate deploy --schema ../../prisma/schema.prisma",
+    "db:seed:ci": "prisma db seed --schema ../../prisma/schema.prisma",
+    "prisma:studio": "dotenv -e ../../.env -- prisma studio --schema ../../prisma/schema.prisma",
+    "db:seed": "dotenv -e ../../.env -- prisma db seed --schema ../../prisma/schema.prisma"
+  },
+  "prisma": {
+    "schema": "../../prisma/schema.prisma",
+    "seed": "ts-node prisma/seed.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "3.717.0",
+    "@aws-sdk/s3-request-presigner": "3.717.0",
+    "@nestjs/common": "10.4.15",
+    "@nestjs/config": "3.3.0",
+    "@nestjs/core": "10.4.15",
+    "@nestjs/jwt": "10.2.0",
+    "@nestjs/passport": "10.0.3",
+    "@nestjs/platform-express": "10.4.15",
+    "@nestjs/throttler": "6.4.0",
+    "@nx-lam/shared": "workspace:*",
+    "@prisma/client": "5.22.0",
+    "argon2": "0.41.1",
+    "class-transformer": "0.5.1",
+    "class-validator": "0.14.1",
+    "helmet": "8.0.0",
+    "multer": "1.4.5-lts.1",
+    "passport": "0.7.0",
+    "passport-jwt": "4.0.1",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.1",
+    "sharp": "^0.35.2"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "10.4.9",
+    "@nestjs/schematics": "10.2.3",
+    "@types/express": "5.0.0",
+    "@types/multer": "1.4.12",
+    "@types/node": "20.17.10",
+    "@types/passport-jwt": "4.0.1",
+    "dotenv-cli": "7.4.4",
+    "prisma": "5.22.0",
+    "ts-node": "10.9.2",
+    "tsconfig-paths": "4.2.0",
+    "typescript": "5.6.3"
+  }
+}

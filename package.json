@@ -1,0 +1,27 @@
+{
+  "name": "nx-lam-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NX-LAM — Equipment Asset & Operations Management Platform (monorepo)",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "build": "pnpm --filter shared build && pnpm --filter api build && pnpm --filter web build",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "prisma:generate": "pnpm --filter api prisma:generate",
+    "prisma:migrate": "pnpm --filter api prisma:migrate",
+    "db:seed": "pnpm --filter api db:seed",
+    "setup": "pnpm install && pnpm --filter api prisma:generate && pnpm --filter api prisma:migrate && pnpm --filter api db:seed"
+  },
+  "dependencies": {
+    "@prisma/client": "5.22.0"
+  },
+  "devDependencies": {
+    "prisma": "5.22.0",
+    "typescript": "5.6.3"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

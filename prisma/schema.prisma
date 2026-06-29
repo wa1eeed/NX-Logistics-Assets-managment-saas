@@ -1,0 +1,909 @@
+// ============================================================
+// Fleet Asset & Operations Platform — Prisma Schema
+// PostgreSQL. مصمّم لقابلية التوسّع (OrgUnit هرمي) وحماية البيانات.
+// ملاحظة: هذا مخطط أساسي للمرحلة 1–3؛ على Claude Code تطويره
+// تدريجياً مع كل موديول وعدم بناء كل الجداول دفعة واحدة.
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------- Enums -----------------------
+
+enum OwnershipType {
+  OWNED              // أصل مملوك (CapEx + إهلاك)
+  EXTERNALLY_RENTED  // مستأجَر خارجياً (OpEx + التزام إعادة)
+}
+
+enum AssetStatus {
+  COMMISSIONING
+  AVAILABLE
+  RESERVED
+  IN_DUTY
+  UNDER_MAINTENANCE
+  OUT_OF_SERVICE
+  FOR_SALE
+  DISPOSED
+}
+
+enum OrgUnitKind {
+  DIVISION
+  DEPARTMENT
+  PROJECT
+}
+
+enum EquipmentRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  FULFILLED
+}
+
+enum ContractStatus {
+  ACTIVE
+  EXTENDED
+  RETURNED
+  CANCELLED
+}
+
+enum InspectionKind {
+  RECEIPT // استلام
+  RETURN  // تسليم
+}
+
+enum WorkOrderStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+  CANCELLED
+}
+
+enum WorkOrderSource {
+  PROJECT
+  DISPATCH
+  PERIODIC
+  BREAKDOWN
+}
+
+enum MaintenanceType {
+  PREVENTIVE
+  CORRECTIVE
+}
+
+enum SaleOrderStatus {
+  PROPOSED
+  APPROVED
+  LISTED   // معروض للبيع
+  SOLD
+  CANCELLED
+}
+
+enum SupplierDealType {
+  SALE
+  RENTAL
+  BOTH
+}
+
+enum DocumentEntityType {
+  ASSET
+  CONTRACT
+  WORK_ORDER
+  DRIVER
+  SALE_ORDER
+  EXTERNAL_LEASE
+}
+
+// ----------------------- RBAC -----------------------
+
+model User {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id           String      @id @default(cuid())
+  email        String      @unique
+  code         String?     // كود المستخدم USR-NNNN (فريد لكل مستأجر)
+  passwordHash String
+  fullName     String
+  isActive     Boolean     @default(true)
+  roles        UserRole[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  deletedAt    DateTime?
+  @@index([tenantId])
+  @@unique([tenantId, code])
+}
+
+model Role {
+  tenantId    String?          // المستأجر المالك للدور — كل شركة تشكّل أدوارها الخاصة
+  id          String           @id @default(cuid())
+  name        String           // SUPER_ADMIN, ASSET_MANAGER, DISPATCH ... (فريد ضمن المستأجر)
+  description String?
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@unique([tenantId, name]) // اسم الدور فريد داخل الشركة فقط
+  @@index([tenantId])
+}
+
+model Permission {
+  id        String           @id @default(cuid())
+  key       String           @unique // assets.read, rentals.approve, sale.create ...
+  roles     RolePermission[]
+}
+
+model RolePermission {
+  tenantId     String?    // المستأجر — لعزل الاستعلامات
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+  @@id([roleId, permissionId])
+  @@index([tenantId])
+}
+
+// ربط المستخدم بدور مع نطاق اختياري (org_unit) لتطبيق Row-Level scoping
+model UserRole {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id        String   @id @default(cuid())
+  userId    String
+  roleId    String
+  orgUnitId String?  // إن وُجد: الدور مقيّد بهذه الوحدة (مثل مدير مشروع)
+  user      User     @relation(fields: [userId], references: [id])
+  role      Role     @relation(fields: [roleId], references: [id])
+  orgUnit   OrgUnit? @relation(fields: [orgUnitId], references: [id])
+  @@unique([userId, roleId, orgUnitId])
+  @@index([tenantId])
+}
+
+// ----------------------- Org hierarchy (قابلية التوسّع) -----------------------
+
+model OrgUnit {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id        String        @id @default(cuid())
+  name      String
+  kind      OrgUnitKind
+  parentId  String?
+  parent    OrgUnit?      @relation("OrgTree", fields: [parentId], references: [id])
+  children  OrgUnit[]     @relation("OrgTree")
+  managerId String?       // مدير المشروع/الإدارة
+  isActive  Boolean       @default(true)
+  contracts RentalContract[]
+  requests  EquipmentRequest[]
+  userRoles UserRole[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  deletedAt DateTime?
+  @@index([tenantId])
+}
+
+// ----------------------- Assets -----------------------
+
+model AssetType {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id           String      @id @default(cuid())
+  name         String      // النوع (فريد لكل مستأجر)
+  category     String?     // التصنيف العام (شاحنات ثقيلة، معدات خدمية ...)
+  unit         String?     // وحدة القياس إن لزم
+  specs        Json?
+  customFields Json?       // حقول مخصّصة يعرّفها الأدمن لهذا النوع: [{key,labelEn,labelAr,type,options?}]
+  assetClassId String?     // صنف الأصل (مركبة/معدة...) — قابل للضبط
+  assetClass   AssetClass? @relation(fields: [assetClassId], references: [id])
+  assets       Asset[]
+  models       Model[]
+
+  @@index([category])
+  @@index([assetClassId])
+  @@index([tenantId])
+  @@unique([tenantId, name])
+}
+
+// صنف الأصل (مركبة / معدة / ملحقات ...) — قائمة قابلة للضبط من السوبر أدمن.
+// fieldProfile يحدّد الحقول المعروضة في التسجيل: VEHICLE | EQUIPMENT | GENERIC
+model AssetClass {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id           String      @id @default(cuid())
+  code         String      // VEHICLE, EQUIPMENT ... (فريد لكل مستأجر)
+  labelEn      String
+  labelAr      String?
+  fieldProfile String      @default("GENERIC") // VEHICLE | EQUIPMENT | GENERIC
+  sortOrder    Int         @default(0)
+  isActive     Boolean     @default(true)
+  assetTypes   AssetType[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  @@index([tenantId])
+  @@unique([tenantId, code])
+}
+
+// كتالوج الموديلات: الماركة → الموديل → الفئة، مرتبط بنوع الأصل.
+model Model {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id           String    @id @default(cuid())
+  manufacturer String    // الماركة (من قائمة MANUFACTURER)
+  name         String    // اسم الموديل
+  category     String?   // الفئة المرتبطة بالموديل
+  assetTypeId  String
+  assetType    AssetType @relation(fields: [assetTypeId], references: [id])
+  sortOrder    Int       @default(0)
+  isActive     Boolean   @default(true)
+  assets       Asset[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([tenantId, manufacturer, name])
+  @@index([assetTypeId])
+  @@index([tenantId])
+}
+
+model Asset {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id            String        @id @default(cuid())
+  code          String        // الرقم التسلسلي/التعريفي (فريد لكل مستأجر)
+  assetTypeId   String
+  assetType     AssetType     @relation(fields: [assetTypeId], references: [id])
+  ownershipType OwnershipType @default(OWNED)
+  status        AssetStatus   @default(COMMISSIONING) // يدخل قيد التجهيز حتى تأكيد الجاهزية
+  forSaleFlag   Boolean       @default(false) // "لا يُعاد تأجيره" أثناء IN_DUTY
+  commissionedAt   DateTime?  // ختم زمني لتأكيد الجاهزية
+  commissionedBy   String?    // من أكّد الجاهزية
+  commissioning    Json?      // قائمة فحص الجاهزية (سلامة + أجهزة + امتثال)
+  modelId       String?       // الموديل من الكتالوج (يشتق منه الماركة/النوع/الفئة)
+  modelRef      Model?        @relation(fields: [modelId], references: [id])
+  category      String?       // الفئة (تُملأ من الموديل) — للفرز والمؤشرات
+  serialNo      String?       // الرقم التسلسلي/الهيكل (للمعدات)
+  capacity      String?       // السعة/المواصفة المختصرة (للمعدات)
+  color         String?       // اللون
+  model         String?
+  manufacturer  String?       // الماركة المصنّعة (لمؤشر أعلى الماركات)
+  year          Int?
+  customValues  Json?         // قيم الحقول المخصّصة حسب نوع الأصل {key: value}
+  region        String?       // المنطقة التشغيلية (لمؤشر جاهزية المناطق)
+  siteName      String?       // الموقع داخل المنطقة (لعدّ المواقع)
+  purchaseDate  DateTime?
+  purchasePrice Decimal?      @db.Decimal(14, 2) // التكلفة الأصلية (لحساب الإهلاك بالقسط الثابت)
+  bookValue     Decimal?      @db.Decimal(14, 2) // تجاوز يدوي للقيمة الدفترية (إن تُرك فارغاً تُحتسب آلياً)
+  depreciationRate Decimal?   @db.Decimal(6, 4)  // نسبة الإهلاك السنوية (مثل 0.20 = 20%)
+  location      String?
+  currentOrgUnitId String?    // الوحدة الحاملة للعهدة حالياً (إن مؤجّر)
+
+  // عدّاد التشغيل (للصيانة الوقائية) — ساعات للمعدات / كيلومترات للمركبات
+  meterType      String     @default("NONE") // NONE | HOURS | KM
+  currentMeter   Int        @default(0)      // آخر قراءة عدّاد
+  meterUpdatedAt DateTime?                    // وقت آخر قراءة
+  trackingEnabled Boolean   @default(false)  // تتبّع GPS مفعّل على هذا الأصل (يحترم حصة الباقة)
+
+  vehicle       VehicleDetail?
+  documents     Document[]
+  contracts     RentalContract[]
+  workOrders    MaintenanceWorkOrder[]
+  meterReadings MeterReading[]
+  plans         MaintenancePlan[]
+  saleOrder     SaleOrder?
+  externalLease ExternalLeaseContract?
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  deletedAt     DateTime?
+
+  @@index([status])
+  @@index([ownershipType])
+  @@index([assetTypeId])
+  @@index([modelId])
+  @@index([tenantId])
+  @@unique([tenantId, code])
+}
+
+model VehicleDetail {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id                 String    @id @default(cuid())
+  assetId            String    @unique
+  asset              Asset     @relation(fields: [assetId], references: [id])
+  plateNumber        String?
+  vin                String?   // رقم الهيكل (Chassis/VIN)
+  registrationExpiry DateTime? // انتهاء الاستمارة
+  periodicInspection DateTime? // الفحص الدوري
+  insuranceExpiry    DateTime? // انتهاء التأمين (سلامة/امتثال)
+  operatingCardNo    String?   // كرت التشغيل
+  customsCardNo      String?   // البطاقة الجمركية
+  currentDriverId    String?
+  currentDriver      Driver?   @relation(fields: [currentDriverId], references: [id])
+  @@index([tenantId])
+}
+
+model Driver {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id             String          @id @default(cuid())
+  fullName       String
+  iqamaNumber    String?
+  licenseExpiry  DateTime?
+  iqamaExpiry    DateTime?
+  isActive       Boolean         @default(true)
+  documents      Document[]
+  vehicles       VehicleDetail[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  deletedAt      DateTime?
+  @@index([tenantId])
+}
+
+// مستندات عامة لأي كيان (R2 file key + تاريخ صلاحية للتنبيه)
+model Document {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id          String             @id @default(cuid())
+  entityType  DocumentEntityType
+  // روابط صريحة اختيارية لتسهيل الاستعلام:
+  assetId     String?
+  asset       Asset?             @relation(fields: [assetId], references: [id])
+  driverId    String?
+  driver      Driver?            @relation(fields: [driverId], references: [id])
+  workOrderId String?
+  workOrder   MaintenanceWorkOrder? @relation(fields: [workOrderId], references: [id])
+  docType     String             // رخصة سير، جمركية، كرت تشغيل، فاتورة، كشف فحص ...
+  fileKey     String             // مفتاح الملف في R2
+  fileName    String?
+  expiryDate  DateTime?          // لتنبيهات الانتهاء
+  uploadedBy  String?
+  createdAt   DateTime           @default(now())
+  deletedAt   DateTime?
+
+  @@index([entityType])
+  @@index([expiryDate])
+  @@index([tenantId])
+}
+
+// ----------------------- Rentals (الطلب/التعميد/العقد/العهدة) -----------------------
+
+model EquipmentRequest {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id          String                 @id @default(cuid())
+  refNo       String?                // كود مرجعي REQ-YYYY-NNNN (فريد لكل مستأجر)
+  orgUnitId   String
+  orgUnit     OrgUnit                @relation(fields: [orgUnitId], references: [id])
+  assetTypeId String
+  fromDate    DateTime
+  toDate      DateTime
+  status      EquipmentRequestStatus @default(PENDING)
+  requestedBy String
+  decidedBy   String?
+  reservedAssetId String?            // الأصل المحجوز عند الاعتماد (قبل إصدار التعميد)
+  notes       String?
+  contract    RentalContract?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  @@index([status])
+  @@index([orgUnitId])
+  @@index([tenantId])
+  @@unique([tenantId, refNo])
+}
+
+model RentalContract {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id              String         @id @default(cuid())
+  authorizationNo String         // رقم التعميد (فريد لكل مستأجر)
+  assetId         String
+  asset           Asset          @relation(fields: [assetId], references: [id])
+  orgUnitId       String
+  orgUnit         OrgUnit        @relation(fields: [orgUnitId], references: [id])
+  requestId       String?        @unique
+  request         EquipmentRequest? @relation(fields: [requestId], references: [id])
+  startDate       DateTime
+  endDate         DateTime
+  status          ContractStatus @default(ACTIVE)
+  internalRate    Decimal?       @db.Decimal(14, 2) // قيمة محاسبية داخلية
+  approvedBy      String?
+  inspections     HandoverInspection[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([status])
+  @@index([assetId])
+  @@index([orgUnitId])
+  @@index([tenantId])
+  @@unique([tenantId, authorizationNo])
+}
+
+model HandoverInspection {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id         String         @id @default(cuid())
+  contractId String
+  contract   RentalContract @relation(fields: [contractId], references: [id])
+  kind       InspectionKind // RECEIPT أو RETURN
+  checklist  Json           // بنود الفحص (إطارات/هيكل/محرّك/عدّاد...) وقيمها
+  odometer   Int?
+  photos     Json?          // قائمة مفاتيح R2
+  notes      String?
+  signedBy   String?        // اسم الموقّع (إقرار داخلي — قرار #4)
+  signedByRole String?      // دور الموقّع
+  signedById String?        // معرّف المستخدم الموقّع
+  ip         String?        // عنوان IP للإقرار
+  signedAt   DateTime?      // ختم زمني للإقرار
+  createdAt  DateTime       @default(now())
+
+  @@index([contractId])
+  @@index([tenantId])
+}
+
+// ----------------------- Maintenance -----------------------
+
+model MaintenanceWorkOrder {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id            String           @id @default(cuid())
+  refNo         String?          // كود مرجعي WO-YYYY-NNNN (فريد لكل مستأجر)
+  assetId       String
+  asset         Asset            @relation(fields: [assetId], references: [id])
+  source        WorkOrderSource
+  type          MaintenanceType  @default(CORRECTIVE)
+  status        WorkOrderStatus  @default(OPEN)
+  priority      String?
+  description   String?
+  totalCost     Decimal?         @db.Decimal(14, 2)
+  card          MaintenanceCard?
+  documents     Document[]
+  openedBy      String?
+  closedBy      String?
+  openedAt      DateTime         @default(now())
+  closedAt      DateTime?
+
+  @@index([status])
+  @@index([assetId])
+  @@index([tenantId])
+  @@unique([tenantId, refNo])
+}
+
+model MaintenanceCard {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id          String               @id @default(cuid())
+  workOrderId String               @unique
+  workOrder   MaintenanceWorkOrder @relation(fields: [workOrderId], references: [id])
+  worksDone   Json?                // الأعمال المنفّذة
+  parts       Json?                // قطع الغيار
+  technician  String?
+  laborHours  Decimal?             @db.Decimal(8, 2)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  @@index([tenantId])
+}
+
+// سجل قراءات العدّاد (ساعات/كيلومترات) — تاريخ يغذّي الصيانة الوقائية.
+model MeterReading {
+  tenantId   String?
+  id         String   @id @default(cuid())
+  assetId    String
+  asset      Asset    @relation(fields: [assetId], references: [id])
+  value      Int
+  note       String?
+  recordedBy String?
+  recordedAt DateTime @default(now())
+
+  @@index([assetId])
+  @@index([tenantId])
+}
+
+// خطة صيانة وقائية: تتكرّر كل intervalValue من (كيلومتر/ساعة/يوم).
+model MaintenancePlan {
+  tenantId         String?
+  id               String   @id @default(cuid())
+  assetId          String
+  asset            Asset    @relation(fields: [assetId], references: [id])
+  name             String   // مثل: تغيير زيت، فحص فرامل
+  intervalType     String   // KM | HOURS | DAYS
+  intervalValue    Int
+  lastServiceMeter Int?     // قراءة العدّاد عند آخر صيانة (لـ KM/HOURS)
+  lastServiceAt    DateTime? // تاريخ آخر صيانة (لـ DAYS + التسجيل)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([assetId])
+  @@index([tenantId])
+}
+
+// ----------------------- Disposal & Acquisition -----------------------
+
+model SaleOrder {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id           String          @id @default(cuid())
+  refNo        String?         // كود مرجعي SALE-YYYY-NNNN (فريد لكل مستأجر)
+  assetId      String          @unique
+  asset        Asset           @relation(fields: [assetId], references: [id])
+  status       SaleOrderStatus @default(PROPOSED)
+  askingPrice  Decimal?        @db.Decimal(14, 2)
+  salePrice    Decimal?        @db.Decimal(14, 2)
+  buyerName    String?
+  proposedBy   String?
+  approvedBy   String?
+  listedAt     DateTime?
+  soldAt       DateTime?
+  // ربح/خسارة البيع = salePrice - bookValue (يُحسب عند الإتمام)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([status])
+  @@index([tenantId])
+  @@unique([tenantId, refNo])
+}
+
+model Supplier {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id        String           @id @default(cuid())
+  name      String
+  dealType  SupplierDealType @default(BOTH)
+  contact   Json?
+  leases    ExternalLeaseContract[]
+  createdAt DateTime         @default(now())
+  deletedAt DateTime?
+  @@index([tenantId])
+}
+
+model ExternalLeaseContract {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id                  String   @id @default(cuid())
+  refNo               String?  // كود مرجعي LEASE-YYYY-NNNN (فريد لكل مستأجر)
+  assetId             String   @unique
+  asset               Asset    @relation(fields: [assetId], references: [id])
+  supplierId          String
+  supplier            Supplier @relation(fields: [supplierId], references: [id])
+  periodicRate        Decimal  @db.Decimal(14, 2) // أجرة دورية (OpEx)
+  ratePeriod          String   @default("MONTHLY")
+  startDate           DateTime
+  endDate             DateTime
+  maintenanceBearer   String?  // COMPANY | SUPPLIER (نقطة حسم #6)
+  insuranceBearer     String?  // COMPANY | SUPPLIER
+  returnObligation    Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([supplierId])
+  @@index([tenantId])
+  @@unique([tenantId, refNo])
+}
+
+// ----------------------- Lookups (قوائم مرجعية قابلة للضبط من السوبر أدمن) -----------------------
+
+model Lookup {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id        String   @id @default(cuid())
+  type      String   // REGION | MANUFACTURER | ASSET_CATEGORY ... (يُضبط من السوبر أدمن)
+  value     String   // القيمة المخزّنة على الكيانات (مثل region على الأصل)
+  labelEn   String
+  labelAr   String?
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, type, value])
+  @@index([type])
+  @@index([tenantId])
+}
+
+// ----------------------- Settings (reference data / alert thresholds) -----------------------
+
+model Setting {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  key       String   @id // مفتاح الإعداد (مثل alerts.documentExpiryDays)
+  value     Json     // القيمة (رقم/نص/كائن)
+  group     String   @default("general")
+  updatedBy String?
+  updatedAt DateTime @updatedAt @default(now())
+  @@index([tenantId])
+}
+
+// ----------------------- Audit -----------------------
+
+model AuditLog {
+  tenantId String? // المستأجر (Tenant) — عزل البيانات
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String   // CREATE/UPDATE/DELETE/APPROVE/STATUS_CHANGE ...
+  entityType String
+  entityId   String
+  before     Json?
+  after      Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([tenantId])
+}
+
+
+// ----------------------- Multi-tenant (SaaS) -----------------------
+
+model Tenant {
+  id        String   @id @default(cuid())
+  slug      String   @unique // معرّف فريد للشركة (للسبدومين/المسار مستقبلاً)
+  code      String   @unique @default("TNT-0000") // كود الشركة TNT-NNNN
+  name      String
+  status    String   @default("ACTIVE") // ACTIVE | TRIAL | SUSPENDED | CANCELED
+  // بيانات حساب الشركة (تُستخدم أيضًا كحقول «المشتري» في الفاتورة الضريبية)
+  legalName    String? // الاسم النظامي الرسمي (للفاتورة)
+  email        String? // البريد الإلكتروني للشركة
+  contactPhone String? // رقم التواصل
+  city         String? // المدينة
+  crNumber     String? // رقم السجل التجاري
+  vatNumber    String? // الرقم الضريبي (VAT)
+  // الهوية البصرية لكل شركة (Per-tenant branding)
+  brandName    String? // الاسم المعروض في الواجهة (بديل name)
+  primaryColor String? // لون العلامة (hex) لتلوين --primary
+  logoKey      String? // مفتاح الشعار في التخزين (R2/محلي)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// مدراء المنصّة (Control Plane) — منفصلون تماماً عن جدول مستخدمي المستأجرين
+// لعزل أثر أي اختراق على جانب المستأجر عن صلاحيات المنصّة العابرة.
+model PlatformAdmin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  fullName     String
+  passwordHash String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+}
+
+// طلب ربط/تخصيص (مثل «وصل») — يُدار يدويًا من لوحة المنصّة، لا يُفعَّل تلقائيًا.
+model IntegrationRequest {
+  tenantId    String?
+  id          String   @id @default(cuid())
+  type        String   @default("WASL") // WASL | ... (قابل للتوسعة)
+  status      String   @default("REQUESTED") // REQUESTED | UNDER_REVIEW | IN_SETUP | ACTIVE | REJECTED | CANCELLED
+  requestedBy String?
+  notes       String?
+  handledBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+// ----------------------- تتبّع المركبات (Phase 6) -----------------------
+
+// اشتراك إضافة التتبّع لكل مستأجر (ضمن الباقة أو كـ Add-on مستقل).
+model TrackingAddon {
+  tenantId        String   @unique
+  id              String   @id @default(cuid())
+  source          String   @default("ADDON") // PLAN | ADDON | BOTH
+  vehicleQuota    Int      @default(0)        // عدد المركبات المسموح تفعيل التتبّع عليها
+  perVehiclePrice Decimal? @db.Decimal(10, 2)
+  status          String   @default("ACTIVE") // ACTIVE | INACTIVE
+  activatedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// جهاز/مصدر موقع مرتبط بأصل (عتاد، تطبيق سائق، أو وصل لاحقًا).
+model TrackingDevice {
+  tenantId   String?
+  id         String   @id @default(cuid())
+  assetId    String
+  provider   String   @default("HARDWARE") // HARDWARE | DRIVER_APP | WASL
+  externalId String   @unique // معرّف الوحدة لدى المزوّد
+  signingKey String   // سرّ HMAC للتحقّق من رسائل الجهاز
+  status     String   @default("ACTIVE")
+  lastSeenAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([assetId])
+}
+
+// إشارة موقع (إحداثيات دورية) — عالية الحجم؛ مفهرسة (assetId, recordedAt).
+model LocationPing {
+  tenantId   String?
+  id         String   @id @default(cuid())
+  assetId    String
+  deviceId   String?
+  lat        Float
+  lng        Float
+  speed      Float?
+  heading    Float?
+  source     String   @default("HARDWARE")
+  recordedAt DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([assetId, recordedAt])
+  @@index([tenantId])
+}
+
+// سياج جغرافي (دخول/خروج) — دائرة أو مضلّع.
+model Geofence {
+  tenantId  String?
+  id        String   @id @default(cuid())
+  name      String
+  type      String   @default("CIRCLE") // CIRCLE | POLYGON
+  geo       Json     // {center:{lat,lng},radiusM} أو {polygon:[[lat,lng],...]}
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+// إعدادات على مستوى المنصّة (غير مرتبطة بمستأجر) مثل حساب R2 المشترك.
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+// اشتراك المستأجر وحدوده (تُدار حصراً من أدمن المنصّة - SaaS Admin).
+// Per-tenant subscription & resource guardrails (managed only by the platform admin).
+model TenantSubscription {
+  id               String   @id @default(cuid())
+  tenantId         String   @unique // مستأجر واحد = اشتراك واحد
+  planId           String?  // ربط بكتالوج الباقات (Plan) — اختياري
+  planName         String   @default("STANDARD") // STARTER | STANDARD | BUSINESS | ENTERPRISE
+  status           String   @default("ACTIVE")   // ACTIVE | TRIAL | PAST_DUE | SUSPENDED | CANCELED
+  maxStorageBytes  BigInt   @default(10737418240) // سقف التخزين التراكمي (10 GiB افتراضياً)
+  maxUserCount     Int      @default(25)          // سقف حسابات الموظفين الفعّالين
+  enabledModules   Json     @default("{}")         // مفاتيح تفعيل الموديولات {"finance":true,...}
+  seatPriceMonthly Decimal? @db.Decimal(10, 2)     // سعر المقعد الإضافي الشهري (per-seat add-on)
+  perVehiclePrice  Decimal? @db.Decimal(10, 2)     // سعر تتبّع المركبة (لقطة من الباقة) — المرحلة 6
+  assetCap         Int?      // سقف عدد الأصول (اختياري، غير مفروض الآن)
+  currentPeriodStart DateTime? // بداية فترة الفوترة الحالية
+  currentPeriodEnd   DateTime? // نهاية فترة الفوترة الحالية
+  renewsAt           DateTime? // موعد التجديد القادم
+  walletBalance    Decimal  @default(0) @db.Decimal(12, 2) // رصيد محفظة الاشتراك (شراء مقاعد/موديولات)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+// كتالوج باقات الاشتراك — يديره مشغّل المنصّة (عام، غير مرتبط بمستأجر).
+model Plan {
+  id              String   @id @default(cuid())
+  name            String   @unique // STARTER | STANDARD | BUSINESS | ENTERPRISE | ...
+  seats           Int      @default(5)    // المقاعد المشمولة بالباقة
+  storageGb       Int      @default(10)   // مساحة التخزين (GB)
+  features        Json     @default("{}") // الموديولات المفعّلة في الباقة
+  priceMonthly    Decimal  @default(0) @db.Decimal(10, 2) // السعر الأساسي الشهري
+  perVehiclePrice Decimal? @db.Decimal(10, 2) // سعر تتبّع المركبة (المرحلة 6)
+  assetCap        Int?      // سقف عدد الأصول (اختياري)
+  isActive        Boolean  @default(true)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// خيار التخزين لكل مستأجر: مشترك (مجلد في حساب المنصّة) أو مخصّص (حاوية الشركة الخاصة).
+// Per-tenant storage option: SHARED (folder in the platform account) or DEDICATED (the
+// company's own S3-compatible bucket — "bring your own bucket", for data residency).
+model TenantStorageConfig {
+  tenantId        String   @unique
+  id              String   @id @default(cuid())
+  mode            String   @default("SHARED")  // SHARED | DEDICATED
+  provider        String   @default("R2")       // R2 | S3 | GCS | OSS (all S3-compatible)
+  endpoint        String?
+  accessKeyId     String?
+  secretAccessKey String?
+  bucket          String?
+  region          String?
+  publicBaseUrl   String?
+  ttl             Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+// دفتر حركات محفظة الاشتراك (شحن رصيد / شراء مقاعد / تفعيل موديول).
+// Append-only ledger of subscription wallet movements (top-ups + add-on purchases).
+model WalletTransaction {
+  tenantId    String?  // المستأجر — عزل بيانات
+  id          String   @id @default(cuid())
+  type        String   // TOPUP | PURCHASE_SEATS | PURCHASE_MODULE
+  amount      Decimal  @db.Decimal(12, 2) // موجب=شحن، سالب=خصم
+  balanceAfter Decimal @db.Decimal(12, 2)
+  description String
+  meta        Json?    // تفاصيل (الكمية، اسم الموديول، إلخ)
+  actorId     String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+// فاتورة ضريبية (بلا تكامل ZATCA الآن؛ حقول ZATCA محجوزة لاحقًا). البائع=المنصّة،
+// المشتري=المستأجر (لقطة وقت الإصدار). الرقم تسلسلي عام INV-YYYY-NNNN.
+model Invoice {
+  tenantId        String?  // المشتري (المستأجر) — للعزل عند عرض الشركة لفواتيرها
+  id              String   @id @default(cuid())
+  number          String   @unique // INV-YYYY-NNNN
+  type            String   @default("STANDARD") // STANDARD | CREDIT
+  status          String   @default("PAID")     // DRAFT | ISSUED | PAID | VOID
+  // البائع (لقطة)
+  sellerName      String
+  sellerVat       String?
+  sellerCr        String?
+  sellerAddress   String?
+  // المشتري (لقطة من بيانات الشركة)
+  buyerName       String
+  buyerVat        String?
+  buyerCr         String?
+  buyerAddress    String?
+  currency        String   @default("SAR")
+  subtotal        Decimal  @db.Decimal(12, 2)
+  vatRate         Decimal  @default(15) @db.Decimal(5, 2)
+  vatAmount       Decimal  @db.Decimal(12, 2)
+  total           Decimal  @db.Decimal(12, 2)
+  periodStart     DateTime?
+  periodEnd       DateTime?
+  subscriptionRef String?  // مرجع الاشتراك/الباقة
+  paymentMethod   String?  // TAP | WALLET | MANUAL
+  paymentRef      String?  // PaymentIntent / charge id
+  zatcaUuid       String?  // محجوز لـ ZATCA لاحقًا
+  zatcaQr         String?  // محجوز لـ ZATCA لاحقًا
+  issuedAt        DateTime @default(now())
+  lines           InvoiceLine[]
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model InvoiceLine {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Decimal  @default(1) @db.Decimal(12, 2)
+  unitPrice   Decimal  @db.Decimal(12, 2)
+  lineTotal   Decimal  @db.Decimal(12, 2)
+  kind        String?  // SEATS | MODULE | TOPUP | PER_VEHICLE | SUBSCRIPTION
+
+  @@index([invoiceId])
+}
+
+// لقطة استهلاك المستأجر (مادّية) — مقاعد مستخدمة + بايتات تخزين. تُحدَّث عند تغيّر
+// الاستهلاك (إنشاء/تعطيل مستخدم، رفع/حذف ملف) ومصدرها مهمّة المطابقة الليلية لاحقًا.
+model TenantUsage {
+  tenantId     String   @id // مستأجر واحد = صف استهلاك واحد
+  seatsUsed    Int      @default(0)
+  storageBytes BigInt   @default(0)
+  updatedAt    DateTime @updatedAt
+}
+
+// نوايا الدفع — كل عملية دفع بالبطاقة عبر بوابة الدفع (Tap) لشحن المحفظة أو
+// شراء مقاعد/تفعيل موديول. تُطبَّق مرة واحدة فقط عند تأكيد الدفع (idempotent).
+model PaymentIntent {
+  tenantId         String?  // المستأجر الدافع — عزل بيانات
+  id               String   @id @default(cuid())
+  purpose          String   // WALLET_TOPUP | SEATS | MODULE
+  amount           Decimal  @db.Decimal(12, 2)
+  currency         String   @default("SAR")
+  quantity         Int?     // SEATS: عدد المقاعد
+  moduleKey        String?  // MODULE: اسم الموديول
+  status           String   @default("PENDING") // PENDING | PAID | FAILED | CANCELED
+  provider         String   @default("TAP")
+  providerChargeId String?  // معرّف الشحنة لدى Tap (chg_xxx)
+  redirectUrl      String?  // رابط صفحة الدفع المستضافة
+  appliedAt        DateTime? // وقت تطبيق الأثر (يمنع التطبيق المزدوج)
+  actorId          String?
+  meta             Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([providerChargeId])
+}
+
+// سجل كائنات التخزين لكل مستأجر — مصدر الحقيقة لاحتساب الاستهلاك (Storage usage).
+// One row per stored object; usage = SUM(sizeBytes) scoped to the tenant.
+model StorageObject {
+  tenantId  String?  // المستأجر — عزل بيانات + احتساب الاستهلاك
+  id        String   @id @default(cuid())
+  key       String   @unique // المفتاح الكامل في R2/القرص (مُنمّط بالمستأجر)
+  sizeBytes BigInt   @default(0)
+  module    String?  // الموديول المالك (assets | work-orders | contracts | ...)
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}

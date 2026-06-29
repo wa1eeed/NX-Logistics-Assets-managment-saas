@@ -1,0 +1,25 @@
+node_modules/
+dist/
+build/
+
+# Secrets — never commit real env files; keep only the *.example templates
+.env
+.env.*
+!.env.example
+!.env.staging.example
+
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+# Vite
+apps/web/dist/
+.vite/
+
+# Local file storage fallback (dev)
+.uploads/
+
+# Misc
+coverage/
+*.tsbuildinfo
