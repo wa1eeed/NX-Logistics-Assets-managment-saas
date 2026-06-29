@@ -4,8 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import {
-  Truck, ClipboardList, Wrench, Satellite, Gauge, Wallet, ShieldCheck, Check, ChevronDown,
-  ArrowRight, Sparkles, Building2, MapPin, Boxes,
+  Truck, ClipboardList, Wrench, Satellite, Gauge, ShieldCheck, Check, ChevronDown,
+  ArrowRight, Sparkles, MapPin, Boxes, ClipboardCheck, IdCard, Banknote, Languages,
 } from 'lucide-react';
 import type { PlanDto } from '@nx-lam/shared';
 import { api } from '../lib/api';
@@ -20,14 +20,17 @@ const FEATURES = [
   { icon: Wrench, key: 'maintenance' },
   { icon: Satellite, key: 'tracking' },
   { icon: Gauge, key: 'kpis' },
-  { icon: Wallet, key: 'billing' },
+  { icon: ClipboardCheck, key: 'handover' },
+  { icon: IdCard, key: 'drivers' },
+  { icon: Banknote, key: 'disposal' },
+  { icon: ShieldCheck, key: 'governance' },
 ] as const;
 
 const STATS = [
   { icon: Boxes, key: 'assets' },
   { icon: MapPin, key: 'regions' },
-  { icon: Building2, key: 'tenants' },
-  { icon: ShieldCheck, key: 'uptime' },
+  { icon: Satellite, key: 'live' },
+  { icon: Languages, key: 'bilingual' },
 ] as const;
 
 /** Premium modules shown as a checklist on each plan (keys match Plan.features). */
