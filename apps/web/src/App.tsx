@@ -7,6 +7,7 @@ import { PageLoader } from './components/PageLoader';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { LandingPage } from './pages/LandingPage';
+import { LegalPage } from './pages/LegalPage';
 
 // Route pages are code-split & lazy-loaded — the Suspense fallback (PageLoader,
 // wired in Layout around <Outlet/>) shows on every navigation.
@@ -58,6 +59,9 @@ export default function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/terms" element={<LegalPage doc="terms" />} />
+        <Route path="/privacy" element={<LegalPage doc="privacy" />} />
+        <Route path="/contact" element={<LegalPage doc="contact" />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
@@ -65,6 +69,9 @@ export default function App() {
 
   return (
     <Routes>
+      <Route path="/terms" element={<LegalPage doc="terms" />} />
+      <Route path="/privacy" element={<LegalPage doc="privacy" />} />
+      <Route path="/contact" element={<LegalPage doc="contact" />} />
       <Route element={<Layout />}>
         <Route index element={hasPermission('platform.tenants.read') ? <Navigate to="/platform" replace /> : <DashboardPage />} />
         <Route path="platform" element={<RequirePermission perm="platform.tenants.read"><PlatformPage /></RequirePermission>} />

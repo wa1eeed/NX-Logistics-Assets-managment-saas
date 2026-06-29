@@ -63,6 +63,44 @@ export const en = {
     cta: { title: 'Ready to run your fleet smarter?', subtitle: 'Set up your company in minutes and bring your whole operation into one place.', button: 'Start free' },
     footer: { tagline: 'Asset & operations management — SaaS', rights: 'NX-LAM. All rights reserved.' },
   },
+  legal: {
+    back: 'Back to home',
+    updated: 'Last updated', updatedDate: 'June 2026',
+    terms: {
+      title: 'Terms of Service',
+      sections: [
+        { h: '1. Acceptance', b: 'By creating an account or using NX-LAM, you agree to these Terms. If you use the service on behalf of a company, you confirm you are authorized to bind that company.' },
+        { h: '2. The service', b: 'NX-LAM is a fleet and asset operations platform provided as software-as-a-service. We may update or improve features over time; we will not materially reduce the core functionality of a paid plan during its term without notice.' },
+        { h: '3. Accounts & access', b: 'You are responsible for your account credentials, the users you invite, and the activity under your account. Keep passwords confidential and notify us of any unauthorized use.' },
+        { h: '4. Your data', b: 'You retain ownership of the data you enter and grant us a limited right to process it solely to operate the service for you. You are responsible for the accuracy and legality of what you upload.' },
+        { h: '5. Subscriptions & payment', b: 'Paid plans, seats and add-ons are billed as shown at checkout, plus applicable VAT, and processed securely via our payment provider. Unless stated otherwise, fees are non-refundable for the period already served.' },
+        { h: '6. Acceptable use', b: 'Do not misuse the service, attempt to breach its security, upload unlawful content, or use it to violate the rights of others.' },
+        { h: '7. Availability & liability', b: 'We work to keep the service available but do not guarantee uninterrupted operation. To the extent permitted by law, our liability is limited to the fees paid in the preceding three months.' },
+        { h: '8. Termination', b: 'You may cancel at any time from your account. We may suspend or terminate accounts that breach these Terms. On termination you may export your data for a reasonable period.' },
+        { h: '9. Changes & contact', b: 'We may update these Terms and will notify you of material changes. Questions? Reach us via the Contact page.' },
+      ],
+    },
+    privacy: {
+      title: 'Privacy Policy',
+      sections: [
+        { h: '1. Scope', b: "This policy explains what data we collect and how we use it. Each company's operational data is isolated and accessible only to its authorized users." },
+        { h: '2. Data we collect', b: 'Account data (name, email, company), the operational data you enter (assets, contracts, maintenance, locations, documents), and technical data (logs, device/usage info) needed to run and secure the service.' },
+        { h: '3. How we use it', b: 'To provide and secure the service, process payments, send transactional notifications, and improve reliability. We do not sell your data.' },
+        { h: '4. Sharing', b: 'We share data only with processors that help us operate the service (cloud hosting, file storage, payment and email providers) under appropriate safeguards, or where required by law.' },
+        { h: '5. Security & retention', b: 'We apply role-based access control, encryption in transit, an append-only audit log, and isolation between companies. We retain data while your account is active and for a limited period afterwards.' },
+        { h: '6. Your rights', b: 'You can access, correct, export or request deletion of your data through your account or by contacting us, subject to legal and contractual obligations.' },
+        { h: '7. Contact', b: 'For privacy questions, reach us via the Contact page.' },
+      ],
+    },
+    contact: {
+      title: 'Contact us',
+      email: 'support@nx-lam.com', emailLabel: 'Email us at', cta: 'Send an email',
+      sections: [
+        { h: 'Sales', b: 'Want a demo or help choosing a plan for your fleet? Email us and we will get back to you quickly.' },
+        { h: 'Support', b: 'Already a customer? Our team is here to help with onboarding, setup and any questions.' },
+      ],
+    },
+  },
   brand: {
     developedBy: 'Developed by',
   },

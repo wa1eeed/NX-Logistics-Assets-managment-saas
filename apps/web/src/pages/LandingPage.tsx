@@ -236,9 +236,11 @@ export function LandingPage() {
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-xs font-extrabold text-white">NX</span>
             <span>{t('landing.footer.tagline')}</span>
           </div>
-          <div className="flex items-center gap-5">
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+            <Link to="/terms" className="hover:text-foreground">{t('legal.terms.title')}</Link>
+            <Link to="/privacy" className="hover:text-foreground">{t('legal.privacy.title')}</Link>
+            <Link to="/contact" className="hover:text-foreground">{t('legal.contact.title')}</Link>
             <Link to="/login" className="hover:text-foreground">{t('landing.nav.login')}</Link>
-            <Link to="/register" className="hover:text-foreground">{t('landing.nav.start')}</Link>
             <span>© {t('landing.footer.rights')}</span>
           </div>
         </div>

@@ -290,8 +290,8 @@ async function seedOperations(ctx: { rentalUnit: { id: string }; maintDept: { id
 }
 
 async function seedTenant() {
-  const slug = process.env.SEED_TENANT_SLUG ?? 'nx';
-  const name = process.env.SEED_TENANT_NAME ?? 'NX Logistics';
+  const slug = process.env.SEED_TENANT_SLUG ?? 'alrawaf';
+  const name = process.env.SEED_TENANT_NAME ?? 'شركة الرواف';
   const tenant = await prisma.tenant.upsert({ where: { slug }, create: { slug, name, status: 'ACTIVE', code: 'TNT-0001' }, update: { name, code: 'TNT-0001' } });
   // Default subscription / guardrails (managed by the platform admin later).
   await prisma.tenantSubscription.upsert({
