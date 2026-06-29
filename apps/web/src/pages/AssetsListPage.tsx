@@ -229,29 +229,38 @@ function RegisterAssetModal({
   classes: AssetClassSummary[]; showFinance: boolean; onClose: () => void; onSaved: (id: string) => void;
 }) {
   const { t, i18n } = useTranslation();
+  const classLabel = (c: AssetClassSummary) => (i18n.language === 'ar' && c.labelAr ? c.labelAr : c.labelEn);
+  const [classId, setClassId] = useState('');
+  const [typeId, setTypeId] = useState('');
   const [manufacturer, setManufacturer] = useState<string | null>(null);
   const [modelId, setModelId] = useState('');
   const [form, setForm] = useState({
-    code: '', ownershipType: OwnershipType.OWNED as string,
+    code: '', ownershipType: OwnershipType.OWNED as string, model: '', color: '',
     year: '', region: '', siteName: '', location: '', purchaseDate: '',
     plateNumber: '', vin: '', serialNo: '', capacity: '',
     purchasePrice: '', depreciationRate: '',
   });
   const [error, setError] = useState('');
 
+  // Top-down cascade: نوع الأصل (class) → التصنيف (type) → الماركة (brand) → الموديل (optional).
+  const typesQ = useQuery({ queryKey: ['asset-types'], queryFn: async () => (await api.get<AssetTypeSummary[]>('/asset-types')).data });
+  const classTypes = (typesQ.data ?? []).filter((tp) => tp.assetClassId === classId);
   const modelsQ = useQuery({
     queryKey: ['models', manufacturer],
     enabled: !!manufacturer,
     queryFn: async () => (await api.get<ModelSummary[]>('/models', { params: { manufacturer } })).data,
   });
-  const selectedModel = modelsQ.data?.find((m) => m.id === modelId) ?? null;
-  const fieldProfile = classes.find((c) => c.code === selectedModel?.assetClassCode)?.fieldProfile ?? 'GENERIC';
-  const isVehicle = fieldProfile === 'VEHICLE';
+  const typeModels = (modelsQ.data ?? []).filter((m) => m.assetTypeId === typeId);
+  const isVehicle = classes.find((c) => c.id === classId)?.fieldProfile === 'VEHICLE';
 
   const mut = useMutation({
     mutationFn: async () => {
       const payload: Record<string, unknown> = {
-        code: form.code, modelId, ownershipType: form.ownershipType,
+        code: form.code, assetTypeId: typeId,
+        modelId: modelId || undefined,
+        manufacturer: manufacturer || undefined,
+        model: modelId ? undefined : (form.model || undefined),
+        color: form.color || undefined, ownershipType: form.ownershipType,
         year: form.year ? Number(form.year) : undefined,
         region: form.region || undefined, siteName: form.siteName || undefined, location: form.location || undefined,
         purchaseDate: form.purchaseDate || undefined,
@@ -283,46 +292,57 @@ function RegisterAssetModal({
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{Object.values(OwnershipType).map((o) => <SelectItem key={o} value={o}>{t(`ownership.${o}`)}</SelectItem>)}</SelectContent>
               </Select></div>
-            {/* Catalog cascade: brand → model */}
+            {/* Cascade: نوع الأصل → التصنيف → الماركة → الموديل (اختياري) */}
+            <div className="space-y-1.5"><Label>{t('assets.assetClass')}</Label>
+              <Select value={classId} onValueChange={(v) => { setClassId(v); setTypeId(''); setModelId(''); }}>
+                <SelectTrigger><SelectValue placeholder="…" /></SelectTrigger>
+                <SelectContent>{classes.filter((c) => c.isActive).map((c) => <SelectItem key={c.id} value={c.id}>{classLabel(c)}</SelectItem>)}</SelectContent>
+              </Select></div>
+            <div className="space-y-1.5"><Label>{t('assets.type')}</Label>
+              <Select value={typeId} onValueChange={(v) => { setTypeId(v); setModelId(''); }} disabled={!classId}>
+                <SelectTrigger><SelectValue placeholder={classId ? '…' : t('assets.classFirst')} /></SelectTrigger>
+                <SelectContent>
+                  {classId && classTypes.length === 0 && <div className="px-3 py-2 text-xs text-muted-foreground">{t('assets.noTypesForClass')}</div>}
+                  {classTypes.map((tp) => <SelectItem key={tp.id} value={tp.id}>{tp.name}</SelectItem>)}
+                </SelectContent>
+              </Select></div>
             <div className="space-y-1.5"><Label>{t('assets.brand')}</Label>
               <LookupSelect type="MANUFACTURER" value={manufacturer} onChange={(v) => { setManufacturer(v); setModelId(''); }} /></div>
-            <div className="space-y-1.5"><Label>{t('assets.selectModel')}</Label>
-              <Select value={modelId} onValueChange={setModelId} disabled={!manufacturer}>
-                <SelectTrigger><SelectValue placeholder={manufacturer ? '…' : t('assets.brandFirst')} /></SelectTrigger>
+            <div className="space-y-1.5"><Label>{t('assets.modelOptional')}</Label>
+              <Select value={modelId || '__none__'} onValueChange={(v) => setModelId(v === '__none__' ? '' : v)} disabled={!manufacturer || !typeId}>
+                <SelectTrigger><SelectValue placeholder={!typeId ? t('assets.typeFirst') : (!manufacturer ? t('assets.brandFirst') : '…')} /></SelectTrigger>
                 <SelectContent>
-                  {modelsQ.data?.length === 0 && <div className="px-3 py-2 text-xs text-muted-foreground">{t('assets.noModels')}</div>}
-                  {modelsQ.data?.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}{m.category ? ` · ${m.category}` : ''}</SelectItem>)}
+                  <SelectItem value="__none__">{t('assets.noModelOption')}</SelectItem>
+                  {typeModels.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}{m.category ? ` · ${m.category}` : ''}</SelectItem>)}
                 </SelectContent>
               </Select></div>
           </div>
 
-          {selectedModel && (
-            <div className="rounded-md bg-accent/40 px-3 py-2 text-xs text-muted-foreground">
-              {t('assets.type')}: <b className="text-foreground">{selectedModel.assetTypeName}</b>
-              {selectedModel.category && <> · {t('assets.category')}: <b className="text-foreground">{selectedModel.category}</b></>}
-              {selectedModel.assetClassCode && (() => { const cc = classes.find((c) => c.code === selectedModel.assetClassCode); const lbl = cc ? (i18n.language === 'ar' && cc.labelAr ? cc.labelAr : cc.labelEn) : selectedModel.assetClassCode; return <> · {t('assets.assetClass')}: <b className="text-foreground">{lbl}</b></>; })()}
+          {typeId && (
+            <div className="grid grid-cols-2 gap-3 border-t pt-4">
+              {!modelId && (
+                <div className="space-y-1.5"><Label>{t('assets.modelName')}</Label><Input value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} placeholder={t('assets.modelNameHint')} /></div>
+              )}
+              {isVehicle ? (
+                <>
+                  <div className="space-y-1.5"><Label>{t('assets.plate')}</Label><Input dir="ltr" value={form.plateNumber} onChange={(e) => setForm({ ...form, plateNumber: e.target.value })} /></div>
+                  <div className="space-y-1.5"><Label>{t('assets.vin')}</Label><Input dir="ltr" value={form.vin} onChange={(e) => setForm({ ...form, vin: e.target.value })} /></div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-1.5"><Label>{t('assets.serialNo')}</Label><Input dir="ltr" value={form.serialNo} onChange={(e) => setForm({ ...form, serialNo: e.target.value })} /></div>
+                  <div className="space-y-1.5"><Label>{t('assets.capacity')}</Label><Input value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} /></div>
+                </>
+              )}
+              <div className="space-y-1.5"><Label>{t('assets.year')}</Label><Input type="number" dir="ltr" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>{t('assets.color')}</Label><Input value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>{t('assets.region')}</Label><LookupSelect type="REGION" value={form.region || null} onChange={(v) => setForm({ ...form, region: v ?? '' })} /></div>
+              <div className="space-y-1.5"><Label>{t('assets.siteName')}</Label><Input value={form.siteName} onChange={(e) => setForm({ ...form, siteName: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>{t('assets.purchaseDate')}</Label><Input type="date" dir="ltr" value={form.purchaseDate} onChange={(e) => setForm({ ...form, purchaseDate: e.target.value })} /></div>
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            {isVehicle ? (
-              <>
-                <div className="space-y-1.5"><Label>{t('assets.plate')}</Label><Input dir="ltr" value={form.plateNumber} onChange={(e) => setForm({ ...form, plateNumber: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label>{t('assets.vin')}</Label><Input dir="ltr" value={form.vin} onChange={(e) => setForm({ ...form, vin: e.target.value })} /></div>
-              </>
-            ) : (
-              <>
-                <div className="space-y-1.5"><Label>{t('assets.serialNo')}</Label><Input dir="ltr" value={form.serialNo} onChange={(e) => setForm({ ...form, serialNo: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label>{t('assets.capacity')}</Label><Input value={form.capacity} onChange={(e) => setForm({ ...form, capacity: e.target.value })} /></div>
-              </>
-            )}
-            <div className="space-y-1.5"><Label>{t('assets.year')}</Label><Input type="number" dir="ltr" value={form.year} onChange={(e) => setForm({ ...form, year: e.target.value })} /></div>
-            <div className="space-y-1.5"><Label>{t('assets.purchaseDate')}</Label><Input type="date" dir="ltr" value={form.purchaseDate} onChange={(e) => setForm({ ...form, purchaseDate: e.target.value })} /></div>
-            <div className="space-y-1.5"><Label>{t('assets.region')}</Label><LookupSelect type="REGION" value={form.region || null} onChange={(v) => setForm({ ...form, region: v ?? '' })} /></div>
-            <div className="space-y-1.5"><Label>{t('assets.siteName')}</Label><Input value={form.siteName} onChange={(e) => setForm({ ...form, siteName: e.target.value })} /></div>
-          </div>
-
-          {showFinance && (
+          {typeId && showFinance && (
             <div className="grid grid-cols-2 gap-3 rounded-md border bg-muted/30 p-3">
               <div className="space-y-1.5"><Label>{t('assets.financial.purchasePrice')}</Label><Input type="number" step="any" dir="ltr" value={form.purchasePrice} onChange={(e) => setForm({ ...form, purchasePrice: e.target.value })} /></div>
               <div className="space-y-1.5"><Label>{t('assets.financial.depreciationRate')}</Label><Input type="number" step="any" dir="ltr" value={form.depreciationRate} onChange={(e) => setForm({ ...form, depreciationRate: e.target.value })} /></div>
@@ -330,7 +350,7 @@ function RegisterAssetModal({
           )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
-            <Button type="submit" disabled={mut.isPending || !modelId || !form.code}>{mut.isPending ? t('common.saving') : t('common.create')}</Button>
+            <Button type="submit" disabled={mut.isPending || !typeId || !form.code}>{mut.isPending ? t('common.saving') : t('common.create')}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
