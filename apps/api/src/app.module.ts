@@ -33,6 +33,7 @@ import { IntegrationsModule } from './modules/integrations/integrations.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { TenantModule } from './modules/tenant/tenant.module';
 import { PreventiveModule } from './modules/preventive/preventive.module';
+import { PublicModule } from './modules/public/public.module';
 
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
@@ -79,6 +80,7 @@ import { HealthController } from './health.controller';
     PlatformModule,
     TenantModule,
     PreventiveModule,
+    PublicModule,
   ],
   controllers: [HealthController],
   providers: [

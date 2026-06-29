@@ -6,6 +6,7 @@ import { Layout } from './components/Layout';
 import { PageLoader } from './components/PageLoader';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { LandingPage } from './pages/LandingPage';
 
 // Route pages are code-split & lazy-loaded — the Suspense fallback (PageLoader,
 // wired in Layout around <Outlet/>) shows on every navigation.
@@ -54,8 +55,10 @@ export default function App() {
   if (!user) {
     return (
       <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
-        <Route path="*" element={<LoginPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
   }
