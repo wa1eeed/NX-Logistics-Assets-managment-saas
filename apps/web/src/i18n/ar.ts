@@ -21,6 +21,18 @@ export const ar: TranslationShape = {
       live_value: 'لحظي', live_label: 'تتبّع GPS مباشر',
       bilingual_value: 'عربي + إنجليزي', bilingual_label: 'واجهة ثنائية اللغة (RTL)',
     },
+    showcase: {
+      tab_assets: 'الأصول', tab_tracking: 'التتبّع', tab_kpis: 'المؤشرات',
+      live: 'مباشر',
+      assets_total: 'إجمالي الأصول', add: 'إضافة',
+      kind_vehicles: 'مركبات', kind_equipment: 'معدات', kind_attachments: 'ملحقات',
+      type_truck: 'شاحنة قلّابة', type_dozer: 'بلدوزر', type_crane: 'رافعة', type_loader: 'لودر',
+      status_active: 'عاملة', status_maint: 'صيانة', status_idle: 'متاحة',
+      veh_active: 'نشطة', veh_idle: 'متاحة', veh_offline: 'غير متصلة',
+      sample_city: 'جدة',
+      kpi_readiness: 'الجاهزية', kpi_utilization: 'الاستغلال', kpi_active: 'نشطة الآن', kpi_alerts: 'تنبيهات',
+      chart_title: 'الاستغلال الشهري',
+    },
     features: { title: 'كل ما تحتاجه لتشغيل أسطولك', subtitle: 'منصّة واحدة عبر دورة حياة الأصل — من التسجيل حتى البيع.' },
     feat: {
       assets_title: 'إدارة الأصول والمعدّات', assets_desc: 'سجل موحّد لكل المركبات والمعدّات والملحقات — أنواع وموديلات وحقول مخصّصة ووثائق (استمارة/تأمين/كرت تشغيل) ودورة حياة كاملة لكل أصل.',

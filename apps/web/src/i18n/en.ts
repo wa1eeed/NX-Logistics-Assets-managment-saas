@@ -19,6 +19,18 @@ export const en = {
       live_value: 'Live', live_label: 'Real-time GPS tracking',
       bilingual_value: 'AR + EN', bilingual_label: 'Bilingual UI (RTL)',
     },
+    showcase: {
+      tab_assets: 'Assets', tab_tracking: 'Tracking', tab_kpis: 'KPIs',
+      live: 'Live',
+      assets_total: 'Total assets', add: 'New',
+      kind_vehicles: 'Vehicles', kind_equipment: 'Equipment', kind_attachments: 'Attachments',
+      type_truck: 'Dump truck', type_dozer: 'Bulldozer', type_crane: 'Crane', type_loader: 'Loader',
+      status_active: 'Operating', status_maint: 'Maintenance', status_idle: 'Available',
+      veh_active: 'Active', veh_idle: 'Available', veh_offline: 'Offline',
+      sample_city: 'Jeddah',
+      kpi_readiness: 'Readiness', kpi_utilization: 'Utilization', kpi_active: 'Active now', kpi_alerts: 'Alerts',
+      chart_title: 'Monthly utilization',
+    },
     features: { title: 'Everything to operate your fleet', subtitle: 'One platform across the asset lifecycle — from registration to disposal.' },
     feat: {
       assets_title: 'Assets & equipment', assets_desc: 'One register for every vehicle, machine and attachment — types, models, custom fields, documents (registration/insurance/operating card) and a full lifecycle per asset.',
