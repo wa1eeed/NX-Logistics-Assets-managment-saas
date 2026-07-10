@@ -2,8 +2,10 @@ import { useState, type FormEvent, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { motion } from 'framer-motion';
 import {
   ArrowLeft, Pencil, RefreshCw, Upload, Download, Trash2, FileText, Tag,
+  Truck, Wrench, MapPin, Calendar, Banknote, Clock, Hash, Layers, Building2, Palette, type LucideIcon,
 } from 'lucide-react';
 import type { AssetProfile, AssetTimeline, WorkOrderSummary } from '@nx-lam/shared';
 import { woStatusVariant } from './MaintenanceListPage';
@@ -31,6 +33,48 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
     <div className="flex justify-between gap-4 border-b py-2.5 last:border-0">
       <span className="text-sm text-muted-foreground">{label}</span>
       <span className="text-sm font-medium text-end">{children ?? '—'}</span>
+    </div>
+  );
+}
+
+/** Small inline fact chip used in the hero header. */
+function Fact({ icon: Icon, children, mono }: { icon: LucideIcon; children: ReactNode; mono?: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+      <Icon className="h-3.5 w-3.5 shrink-0" />
+      <span className={cn('text-foreground', mono && 'font-mono')}>{children}</span>
+    </span>
+  );
+}
+
+/** At-a-glance KPI tile below the hero. */
+function StatTile({ icon: Icon, label, value, tint }: { icon: LucideIcon; label: string; value: ReactNode; tint?: boolean }) {
+  return (
+    <div className="rounded-xl border bg-card p-3.5">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Icon className={cn('h-4 w-4', tint && 'text-primary')} />{label}
+      </div>
+      <div className={cn('mt-1.5 truncate text-lg font-bold tabular-nums', tint && 'text-primary')}>{value}</div>
+    </div>
+  );
+}
+
+/** Label/value pair for the definition grids. */
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 truncate text-sm font-medium">{children ?? '—'}</dd>
+    </div>
+  );
+}
+
+/** Titled group of Fields in a responsive definition grid. */
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div>
+      <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">{children}</dl>
     </div>
   );
 }
@@ -73,77 +117,116 @@ export function AssetProfilePage() {
     { key: 'timeline', label: t('assets.tabs.timeline') },
   ];
 
+  const lang = i18n.language;
+  const HeroIcon = a.fieldProfile === 'VEHICLE' ? Truck : Wrench;
+  const classLabel = (lang === 'ar' ? a.assetClassLabelAr : a.assetClassLabelEn) ?? a.category ?? '—';
+  const age = a.financial?.ageYears ?? (a.year ? new Date().getFullYear() - a.year : null);
+
   return (
     <div>
       <Button variant="ghost" size="sm" className="mb-3" onClick={() => navigate('/assets')}>
         <ArrowLeft className="h-4 w-4 rtl:rotate-180" />{t('assets.backToList')}
       </Button>
 
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="font-mono text-2xl font-bold tracking-tight">{a.code}</h1>
-            <Badge variant={statusVariant[a.status]}>{t(`assetStatus.${a.status}`)}</Badge>
-            {a.forSaleFlag && <Badge variant="warning">{t('assets.forSaleFlag')}</Badge>}
+      {/* Hero */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}
+        className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/[0.06] via-card to-card p-5 sm:p-6"
+      >
+        <div className="pointer-events-none absolute -end-12 -top-12 h-44 w-44 rounded-full bg-primary/10 blur-3xl" />
+        <div className="relative flex flex-wrap items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-4">
+            <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20">
+              <HeroIcon className="h-8 w-8" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="font-mono text-2xl font-bold tracking-tight">{a.code}</h1>
+                <Badge variant={statusVariant[a.status]}>{t(`assetStatus.${a.status}`)}</Badge>
+                {a.forSaleFlag && <Badge variant="warning">{t('assets.forSaleFlag')}</Badge>}
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">{a.assetTypeName} · {classLabel} · {t(`ownership.${a.ownershipType}`)}</p>
+              <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
+                {(a.manufacturer || a.modelName) && <Fact icon={Tag}>{[a.manufacturer, a.modelName].filter(Boolean).join(' ')}</Fact>}
+                {a.year != null && <Fact icon={Calendar}>{a.year}</Fact>}
+                {a.region && <Fact icon={MapPin}>{a.region}</Fact>}
+                {a.vehicle?.plateNumber && <Fact icon={Hash} mono>{a.vehicle.plateNumber}</Fact>}
+                {a.color && <Fact icon={Palette}>{a.color}</Fact>}
+              </div>
+            </div>
           </div>
-          <p className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-            <Tag className="h-3.5 w-3.5" />{a.assetTypeName} · {t(`ownership.${a.ownershipType}`)}
-          </p>
+          {canStatus && a.allowedTransitions.length > 0 && (
+            <Button onClick={() => setChangingStatus(true)}><RefreshCw className="h-4 w-4" />{t('assets.changeStatus')}</Button>
+          )}
         </div>
-        {canStatus && a.allowedTransitions.length > 0 && (
-          <Button onClick={() => setChangingStatus(true)}><RefreshCw className="h-4 w-4" />{t('assets.changeStatus')}</Button>
-        )}
+      </motion.div>
+
+      {/* Quick stats */}
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {a.financial
+          ? <StatTile icon={Banknote} tint label={t('assets.financial.effectiveBookValue')} value={fmtMoney(a.financial.effectiveBookValue, lang)} />
+          : <StatTile icon={Layers} label={t('assets.category')} value={a.category ?? '—'} />}
+        <StatTile icon={Clock} label={t('assets.financial.ageYears')} value={age ?? '—'} />
+        <StatTile icon={MapPin} label={t('assets.region')} value={a.region ?? '—'} />
+        <StatTile icon={Building2} label={t('assets.siteName')} value={a.siteName ?? '—'} />
       </div>
 
       {a.status === 'COMMISSIONING' && canUpdate && (
-        <ReadinessPanel assetId={a.id} onCommissioned={refresh} />
+        <div className="mt-4"><ReadinessPanel assetId={a.id} onCommissioned={refresh} /></div>
       )}
 
-      <div className="mb-4 flex flex-wrap gap-1 border-b">
+      {/* Tabs (segmented) */}
+      <div className="mb-5 mt-5 flex gap-1 overflow-x-auto rounded-xl bg-muted/60 p-1">
         {tabs.map((tb) => (
           <button
             key={tb.key}
             onClick={() => setTab(tb.key)}
             className={cn(
-              'relative px-4 py-2.5 text-sm font-medium transition-colors',
-              tab === tb.key ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+              'whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-medium transition-colors',
+              tab === tb.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
             )}
           >
             {tb.label}
-            {tab === tb.key && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary" />}
           </button>
         ))}
       </div>
 
       {tab === 'general' && (
         <Card>
-          <CardContent className="pt-6">
-            <div className="mb-2 flex justify-end">
+          <CardContent className="space-y-6 pt-6">
+            <div className="flex justify-end">
               {canUpdate && <Button variant="outline" size="sm" onClick={() => setEditGeneral(true)}><Pencil className="h-3.5 w-3.5" />{t('common.edit')}</Button>}
             </div>
-            <Row label={t('assets.assetClass')}>{(a.assetClassLabelAr && i18n.language === 'ar' ? a.assetClassLabelAr : a.assetClassLabelEn) ?? '—'}</Row>
-            <Row label={t('assets.manufacturer')}>{a.manufacturer ?? '—'}</Row>
-            <Row label={t('assets.model')}>{a.modelName ?? '—'}</Row>
-            <Row label={t('assets.category')}>{a.category ?? '—'}</Row>
-            {a.serialNo && <Row label={a.fieldProfile === 'VEHICLE' ? t('assets.vin') : t('assets.serialNo')}>{a.serialNo}</Row>}
-            {a.capacity && <Row label={t('assets.capacity')}>{a.capacity}</Row>}
-            {a.color && <Row label={t('assets.color')}>{a.color}</Row>}
-            <Row label={t('assets.year')}>{a.year}</Row>
-            <Row label={t('assets.region')}>{a.region}</Row>
-            <Row label={t('assets.siteName')}>{a.siteName}</Row>
-            <Row label={t('assets.location')}>{a.location}</Row>
-            <Row label={t('assets.purchaseDate')}>{fmtDate(a.purchaseDate)}</Row>
-            <Row label={t('assets.ownership')}>{t(`ownership.${a.ownershipType}`)}</Row>
+            <Section title={t('assets.sectionIdentity')}>
+              <Field label={t('assets.assetClass')}>{classLabel}</Field>
+              <Field label={t('assets.manufacturer')}>{a.manufacturer ?? '—'}</Field>
+              <Field label={t('assets.model')}>{a.modelName ?? '—'}</Field>
+              <Field label={t('assets.category')}>{a.category ?? '—'}</Field>
+              {a.serialNo && <Field label={a.fieldProfile === 'VEHICLE' ? t('assets.vin') : t('assets.serialNo')}>{a.serialNo}</Field>}
+              {a.capacity && <Field label={t('assets.capacity')}>{a.capacity}</Field>}
+              {a.color && <Field label={t('assets.color')}>{a.color}</Field>}
+              <Field label={t('assets.year')}>{a.year ?? '—'}</Field>
+            </Section>
 
-            {/* Admin-defined custom fields for this asset type */}
+            <div className="border-t" />
+            <Section title={t('assets.sectionLocation')}>
+              <Field label={t('assets.region')}>{a.region ?? '—'}</Field>
+              <Field label={t('assets.siteName')}>{a.siteName ?? '—'}</Field>
+              <Field label={t('assets.location')}>{a.location ?? '—'}</Field>
+              <Field label={t('assets.purchaseDate')}>{fmtDate(a.purchaseDate)}</Field>
+              <Field label={t('assets.ownership')}>{t(`ownership.${a.ownershipType}`)}</Field>
+            </Section>
+
             {a.customFields.length > 0 && (
-              <div className="mt-4 border-t pt-4">
-                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('assets.customFields')}</div>
-                {a.customFields.map((f) => {
-                  const v = a.customValues?.[f.key];
-                  return <Row key={f.key} label={i18n.language === 'ar' ? f.labelAr : f.labelEn}>{v != null && v !== '' ? String(v) : '—'}</Row>;
-                })}
-              </div>
+              <>
+                <div className="border-t" />
+                <Section title={t('assets.customFields')}>
+                  {a.customFields.map((f) => {
+                    const v = a.customValues?.[f.key];
+                    return <Field key={f.key} label={lang === 'ar' ? f.labelAr : f.labelEn}>{v != null && v !== '' ? String(v) : '—'}</Field>;
+                  })}
+                </Section>
+              </>
             )}
           </CardContent>
         </Card>
@@ -157,13 +240,13 @@ export function AssetProfilePage() {
               {canUpdate && <Button variant="outline" size="sm" onClick={() => setEditVehicle(true)}><Pencil className="h-3.5 w-3.5" />{t('common.edit')}</Button>}
             </div>
             {a.vehicle ? (
-              <>
-                <Row label={t('assets.vehicle.plateNumber')}>{a.vehicle.plateNumber}</Row>
-                <Row label={t('assets.vehicle.registrationExpiry')}>{fmtDate(a.vehicle.registrationExpiry)}</Row>
-                <Row label={t('assets.vehicle.periodicInspection')}>{fmtDate(a.vehicle.periodicInspection)}</Row>
-                <Row label={t('assets.vehicle.operatingCardNo')}>{a.vehicle.operatingCardNo}</Row>
-                <Row label={t('assets.vehicle.customsCardNo')}>{a.vehicle.customsCardNo}</Row>
-              </>
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
+                <Field label={t('assets.vehicle.plateNumber')}>{a.vehicle.plateNumber ?? '—'}</Field>
+                <Field label={t('assets.vehicle.registrationExpiry')}>{fmtDate(a.vehicle.registrationExpiry)}</Field>
+                <Field label={t('assets.vehicle.periodicInspection')}>{fmtDate(a.vehicle.periodicInspection)}</Field>
+                <Field label={t('assets.vehicle.operatingCardNo')}>{a.vehicle.operatingCardNo ?? '—'}</Field>
+                <Field label={t('assets.vehicle.customsCardNo')}>{a.vehicle.customsCardNo ?? '—'}</Field>
+              </dl>
             ) : (
               <p className="py-6 text-center text-sm text-muted-foreground">{t('assets.vehicle.none')}</p>
             )}

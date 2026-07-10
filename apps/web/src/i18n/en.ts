@@ -793,6 +793,8 @@ export const en = {
     atProject: 'At project',
     color: 'Color',
     customFields: 'Custom fields',
+    sectionIdentity: 'Identification',
+    sectionLocation: 'Location & ownership',
     assetClass: 'Asset type',
     category: 'Category',
     serialNo: 'Serial number',

@@ -795,6 +795,8 @@ export const ar: TranslationShape = {
     atProject: 'لدى مشروع',
     color: 'اللون',
     customFields: 'حقول مخصّصة',
+    sectionIdentity: 'التعريف',
+    sectionLocation: 'الموقع والملكية',
     assetClass: 'نوع الأصل',
     category: 'الفئة',
     serialNo: 'الرقم التسلسلي',
