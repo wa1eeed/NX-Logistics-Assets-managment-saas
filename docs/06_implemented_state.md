@@ -1,6 +1,6 @@
 # 06 — الحالة المنفّذة (As-Built) — مرجع شامل
 
-> هذا المستند هو **مصدر الحقيقة لما تم بناؤه فعلاً** حتى 2026-06-28. الوثائق 01–05 هي
+> هذا المستند هو **مصدر الحقيقة لما تم بناؤه فعلاً** حتى 2026-07-10 (المنصّة **حيّة على `lam.nx.sa`** — راجع §11). الوثائق 01–05 هي
 > مواصفات البناء الأصلية (الـ Kit)؛ هذا الملف يوثّق ما نُفّذ ووُسّع وصُحّح فوقها —
 > وأهمّه تحويل المنصّة من نظام أحادي الشركة إلى **منصّة SaaS متعدّدة المستأجرين**.
 
@@ -62,8 +62,9 @@
 | `rentals`, `handover`, `maintenance`, `preventive` | `payments` (بوابة Tap) |
 | `disposal`, `acquisition`, `suppliers`, `drivers` | `platform` (مشغّل المنصّة) |
 | `kpis`, `dashboard`, `lookups`, `settings`, `audit`, `notifications` | `tenant` (هوية/شعار الشركة) |
+| `tracking` (كونسول + أجهزة + استقبال HMAC + نطاقات + أحداث), `invoices` | `public` (باقات عامة), `maps` (مزوّد الخرائط + مفتاح ORS), `routing` (ORS) |
 
-تكاملات: `integrations/storage` (S3-متوافق) و`integrations/payments` (Tap).
+تكاملات: `integrations/storage` (S3-متوافق) و`integrations/payments` (Tap). الخرائط: مزوّد قابل للتبديل (قوقل/OSM) عبر طبقة تجريد — راجع §11.4.
 
 الطبقات: Controller (HTTP) → Service (منطق) → Prisma (بيانات) → DTO (تحقّق class-validator).
 حُرّاس عامون: `JwtAuthGuard` + `PermissionsGuard` + `ModuleAccessGuard`. معترِض تدقيق عام.
@@ -273,7 +274,7 @@
   و`AssetType.customFields`
 - `MeterReading` · `MaintenancePlan`
 - `Invoice` · `InvoiceLine` (الفاتورة الضريبية) · `Tenant` (+ legalName/email/contactPhone/city/crNumber/vatNumber)
-- `TrackingAddon` · `TrackingDevice` · `LocationPing` · `Geofence` + `Asset.trackingEnabled` (التتبّع)
+- `TrackingAddon` · `TrackingDevice` · `LocationPing` · `Geofence` · **`GeofenceEvent`** (أحداث دخول/خروج) + `Asset.trackingEnabled` · **`Asset.geoZoneIds`** (عضوية النطاقات الحالية لاكتشاف العبور)
 - `IntegrationRequest` (طلبات الربط/التخصيص مثل وصل)
 - `Role`/`RolePermission` أصبحا يحملان `tenantId` (معزولان لكل شركة)
 - `tenantId` أُضيف على كل الكيانات الجذرية (المستخدمون، الوحدات، الأصول، العقود، ...).
@@ -284,7 +285,7 @@ kpi_dimensions → lookups → refnos_and_handover_signoff → commissioning →
 → wallet_and_billing → tenant_storage_config → preventive_meter_compliance → asset_color_customfields
 → **add_platform_admin** → add_payment_intent → add_tenant_branding → **tenant_scoped_roles** →
 add_tenant_company_profile → add_tenant_usage → add_plan_catalog_and_subscription_period → **add_invoice**
-→ **add_vehicle_tracking** → **add_integration_request**.
+→ **add_vehicle_tracking** → **add_integration_request** → **add_geofence_events** (2026-07-10).
 
 ---
 
@@ -301,7 +302,8 @@ add_tenant_company_profile → add_tenant_usage → add_plan_catalog_and_subscri
   `storageWarning` عند ≥٩٠٪) ثم **منع صارم عند ١٠٠٪** (`assertStorageAvailable`). ملاحظة: الرفع يتم عبر
   الـ API (يفرض الحجم والحصة خادميًا)؛ Presigned POST المباشر مؤجَّل لتجنّب إعادة هيكلة مسارات الرفع العاملة.
 - **بوابة الدفع — Tap:** انظر §3.3.
-- **Resend / Sentry / CDN / Google Maps:** كما في 04 (مدفوعة بالبيئة، تعطيل لطيف).
+- **الخرائط والمسارات (2026-07-10):** مفتاح **خرائط قوقل** ومفتاح **OpenRouteService** يُداران من لوحة المنصّة (`PlatformSetting`، احتياطي env). مزوّد الخرائط قابل للتبديل قوقل⇄OSM عبر **طبقة تجريد** مع ارتداد تلقائي، والمسارات موكَّلة خادميًا. راجع §11.4 و§11.6.
+- **Resend / Sentry / CDN:** كما في 04 (مدفوعة بالبيئة، تعطيل لطيف).
 
 ---
 
@@ -335,7 +337,7 @@ add_tenant_company_profile → add_tenant_usage → add_plan_catalog_and_subscri
 → تشغيل الستاك الكامل (db سليمة، api سليم، **26 ترحيلًا طُبّق آليًا**)، البذور استوردت الأسطول الحقيقي (1947)،
 الويب يخدم الصفحات والروابط العميقة (`/assets`, `/assets/:id` → 200)، و**تسجيل الدخول عبر الويب→nginx→api→Postgres
 أعاد JWT (200)**. ملاحظات مثبّتة: مدخل الـ api هو `apps/api/dist/src/main.js`؛ ومخرجات Vite نُقلت إلى `/static`
-(بدل `/assets`) لتفادي تعارض مسار «الأصول» مع مجلد الأصول الثابتة. النشر الفعلي على الـ VPS خطوة العميل (Coolify + أسراره).
+(بدل `/assets`) لتفادي تعارض مسار «الأصول» مع مجلد الأصول الثابتة. **وقد نُشرت المنصّة فعليًا وأصبحت حيّة على `https://lam.nx.sa` (2026-07-10) — راجع §11 لتفاصيل النشر على Coolify والتصحيحات ونموذج البذر.**
 
 ---
 
@@ -345,6 +347,54 @@ add_tenant_company_profile → add_tenant_usage → add_plan_catalog_and_subscri
 حُرّاس الاستحقاقات (403)، تدفّق Tap (config/checkout/verify/webhook/idempotency/sandbox)،
 التسجيل الذاتي + الهوية البصرية (تلوين الشريط الجانبي)، عزل الأدوار لكل شركة (تعديل دور
 شركة لا يمسّ غيرها)، والانتحال. التفاصيل الدقيقة محفوظة في ذاكرة المشروع.
+
+---
+
+## 11) جولة الإطلاق والتشغيل — تحديثات 2026-07-10
+
+نُشرت المنصّة **حيّة على Coolify** (`https://lam.nx.sa`)، وأُجريت جولة تشغيل/تصحيح موسّعة. هذا القسم يوثّق كل ما تغيّر بعد النشر.
+
+### 11.1 النشر الحيّ (Coolify) وتصحيحات الحزمة
+- **حيّة على `https://lam.nx.sa`** عبر مورد Docker-Compose واحد (db + api + web)، والدومين مربوط بخدمة **web**، وCoolify يصدر شهادة Let's Encrypt.
+- **سياق البناء `.` وليس `..`:** Coolify يضبط `--project-directory` على جذر المستودع، فتحوّل `context: ..` إلى خارج المستودع وفشل البناء (`lstat /artifacts/deploy`). الحل: `context: .` + `dockerfile: deploy/Dockerfile.*` (يعمل مع Coolify، ويدويًا بـ `--project-directory .`).
+- **الويب بلا نشر منفذ:** `ports: 8080:80` اصطدم ببروكسي Coolify (`port already allocated`). الحل: `expose: "80"` فقط، وبروكسي Coolify يوجّه الدومين للحاوية. للمضيف المستقل بلا بروكسي: `deploy/compose.publish.yml` (override يضيف المنفذ).
+
+### 11.2 نموذج البذر متعدّد الأوضاع (`SEED_MODE`) — فصل المنصّة عن المستأجرين
+أُعيدت هيكلة `apps/api/prisma/seed.ts` بحيث **متغيّرات Coolify تحمل فقط بيانات مشغّل المنصّة** (`SEED_PLATFORM_*`)، وكل شركة — بما فيها الرواف — **مشترك (tenant)** يُهيّأ مستقلاً:
+- **`bootstrap`** (الافتراضي؛ يشغّله `db:seed:ci` و`prisma migrate reset`): مشغّل المنصّة + الباقات + الصلاحيات فقط. لا مستأجر، لا أسطول.
+- **`onboard`** (`onboard:ci`): يُهيّئ مشتركًا نظيفًا — شركة + اشتراك + أدواره الخاصة + سوبر أدمن + المرجعية + الأسطول الحقيقي (1947) + **8 حسابات موظفين** (بريدهم يُشتقّ من نطاق الأدمن: `admin@company.ex → asset.manager@company.ex, dispatch@…, pm1@…, pm2@…`). بيانات الأدمن تُمرَّر وقت التشغيل (`ONBOARD_ADMIN_*`) — لا في الريبو ولا في env. `ONBOARD_WITH_STAFF=0` لتخطّي الموظفين، و`SEED_DEMO=1` يضيف عمليات تجريبية.
+- **`full`** (`db:seed:full`): bootstrap + مشترك تجريبي ممتلئ (للتطوير المحلي).
+- **`resync-roles`** (`roles:resync:ci`): يعيد مزامنة أدوار كل المستأجرين مع قالب `ROLES` (لسريان تغييرات الصلاحيات على مستأجر حيّ بلا إعادة تهيئة). ⚠️ يستبدل أي تعديل يدوي على الأدوار.
+- **`demo-tracking`** (`demo:tracking:ci`): بيانات تتبّع تجريبية (انظر §11.8).
+- **`prisma:reset:ci`**: `migrate reset --force` (مسح + ترحيل + bootstrap).
+- الحالة الحيّة: **مشغّل المنصّة = `waleed@nx.sa`**؛ **الرواف = مشترك `TNT-0001`** (أدمن `admin@company.ex`).
+
+### 11.3 تفرّد البريد عبر جدولَي الهوية
+`login()` يحلّ مستخدم المستأجر (`User`) قبل مشغّل المنصّة (`PlatformAdmin`)، فبريد مستأجر يطابق مشغّل المنصّة كان يحجب دخوله. أُضيف `assertEmailNotPlatformOperator()` (`apps/api/src/common/email-uniqueness.ts`) ويُستدعى في كل مواضع إنشاء مستخدم مستأجر: التسجيل الذاتي، `platform.createTenant`، و`users.create`.
+
+### 11.4 طبقة تجريد مزوّد الخرائط (Map Provider Layer)
+- **مفتاح خرائط قوقل** على مستوى المنصّة (`PlatformSetting` + احتياطي `GOOGLE_MAPS_API_KEY`)، يُدار من لوحة المنصّة ببطاقة «مزوّد الخرائط» (صلاحية `maps.manage`). مفتاح Maps JS عام بطبيعته → يُمرَّر للمتصفّح عبر `GET /maps/runtime`.
+- **`<MapView/>`** واجهة واحدة محايدة يرسمها التطبيق؛ الاختيار خلفها عبر **سِجِلّ `MAP_PROVIDERS`** (`google`, `osm`) + `useActiveMapProvider()` الذي يقرأ **تفضيل المنصّة** (`auto | google | osm`) ثم التوفّر ثم فشل التشغيل. **إضافة مزوّد جديد = سطر في السجل، دون لمس صفحات التطبيق.**
+- **ارتداد تلقائي وقت التشغيل:** عند مفتاح خاطئ/تعطّل فوترة/**نفاد رصيد قوقل** (`gm_authFailure`) أو فشل التحميل → تتحوّل كل الخرائط تلقائيًا إلى **OpenStreetMap/Leaflet** لبقية الجلسة (فوق ارتداد «لا مفتاح» الموجود). المكتبة: `@react-google-maps/api`.
+
+### 11.5 النطاقات الجغرافية — تسمية + محرّر تفاعلي + محرّك اكتشاف + تنبيهات
+- **إعادة التسمية** (عربي): «الأسيجة الجغرافية» → **«النطاقات الجغرافية»**.
+- **محرّر تفاعلي** (`GeofenceEditor`) على خرائط قوقل: رسم دائرة/مضلّع على الخريطة + تسمية + حذف — بدل كتابة الإحداثيات يدويًا (النموذج اليدوي يبقى ارتدادًا عند غياب المفتاح).
+- **محرّك الاكتشاف:** عند كل موقع وارد يحسب الاحتواء (haversine للدائرة، ray-casting للمضلّع — `tracking/geofence-detect.ts`)، يقارن بحالة الأصل المخزّنة (`Asset.geoZoneIds`)، ويسجّل أحداث **دخول/خروج** في جدول **`GeofenceEvent`** (ترحيل `20260710083131_add_geofence_events`). يعمل داخل سياق مستأجر الجهاز، ولا يُفشل الاستقبال.
+- **العرض والتنبيه:** `GET /tracking/geofence-events` + بطاقة «أحداث النطاقات» الحيّة؛ والأحداث تُدرَج في **موجز التنبيهات** (`AlertsService`, نوع `GEOFENCE_EVENT`, إعداد `alerts.geofenceEventDays` افتراضي يومان) فتظهر في جرس/صفحة التنبيهات وبريد الملخّص (Resend).
+
+### 11.6 المسارات (OpenRouteService)
+- **مفتاح ORS خادمي فقط** (سرّ، غير مقيّد بالـ referrer) في بطاقة «مزوّد الخرائط»؛ كل نداءات المسارات تُوكَّل عبر الخادم فلا يصل المفتاح للمتصفّح. احتياطي `OPENROUTESERVICE_API_KEY`.
+- **`RoutingModule`:** `POST /routing/directions` (طريق قيادة A→B + مسافة/زمن)، `POST /routing/optimize` (ترتيب أمثل لعدّة محطات عبر ORS Optimization ثم رسمه)، و`GET /tracking/assets/:id/trail?hours=` يرجّع مسار مركبة من مواقعها. الإحداثيات `[lat,lng]` داخليًا وتُحوَّل لـ `[lng,lat]` عند ORS.
+- **واجهة `RoutingControl`** العائمة على خريطة التتبّع بثلاثة أوضاع: **اتجاهات** (نقر نقاط)، **تحسين** (بداية + محطات)، **مسار الرحلة** (اختيار مركبة). كلا المزوّدين (قوقل و Leaflet) يرسم المسار + نقاط الطريق.
+
+### 11.7 تصحيحات الصلاحيات (RBAC) وتسجيل الخروج
+- **مدير المشروع** حصل على `drivers.read` + `drivers.manage` → يُسند سائقًا لمركبة المشروع قبل تشغيلها (صفحة «السائقون» → زر الإسناد).
+- **الاشتراك والأجهزة (الربط)** خاصّة بأدمن الشركة: مساراتها **وعناصر قائمتها الجانبية** صارت تتطلّب **`billing.manage`**؛ وإشعار «التتبّع غير مفعّل» لا يعرض رابط الاشتراك إلا لمن يملكها (وغيره يُوجَّه لمراجعة الأدمن). وأُضيفت صلاحية `maps.manage` لدور المنصّة.
+- **تسجيل الخروج** يوجّه إلى `/login` (كان يسقط على صفحة الهبوط): زر الخروج ينتقل صراحةً، ومسار غير المصرّح `*` صار يوجّه لـ `/login` (يغطّي انتهاء الجلسة أيضًا).
+
+### 11.8 بيانات التتبّع التجريبية — ⚠️ توضيح مهم
+حتى تُركَّب أجهزة GPS ويُبنى **تطبيق السائقين**، **لا يوجد مصدر مواقع حقيقي**. أمر `demo:tracking:ci` (`SEED_MODE=demo-tracking`) **يُدخل مواقع مُصطنعة مباشرةً في القاعدة** (يفعّل إضافة التتبّع + 8 مركبات + مواقع حديثة بإحداثيات مدن سعودية) **لمعاينة الواجهة فقط** — وليست تتبّعًا حقيقيًا. أما **خط الأنابيب الحقيقي فجاهز وصحيح**: `POST /tracking/ingest` (موقّع بـ HMAC لكل جهاز) → تسجيل موقع → محرّك اكتشاف النطاقات؛ ينتظر فقط جهازًا حقيقيًا أو تطبيق السائق. لتنظيف البيانات التجريبية: حذف `LocationPing` للمستأجر + `trackingEnabled=false` على أصوله + إزالة `TrackingAddon`.
 
 ---
 
