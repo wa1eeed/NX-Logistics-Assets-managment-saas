@@ -1,0 +1,15 @@
+# ============================================================
+# Optional override — publish the web port on the HOST.
+# Use this ONLY on a standalone Docker host that has NO reverse proxy
+# in front (i.e. not Coolify — Coolify's built-in proxy routes the
+# assigned domain to the container, so publishing a host port there
+# collides with it: "Bind for 0.0.0.0:8080 failed: port already allocated").
+#
+#   docker compose -f deploy/docker-compose.staging.yml -f deploy/compose.publish.yml \
+#     --project-directory . --env-file .env.staging up -d --build
+#   # web is then reachable on http://localhost:${WEB_PORT:-8080}
+# ============================================================
+services:
+  web:
+    ports:
+      - "${WEB_PORT:-8080}:80"

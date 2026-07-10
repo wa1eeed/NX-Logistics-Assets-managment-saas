@@ -36,8 +36,10 @@
 
 ```bash
 cp .env.staging.example .env.staging   # املأ POSTGRES_PASSWORD و JWT_* و WEB_PUBLIC_URL
-# مرّر --project-directory . حتى يشير سياق البناء (.) إلى جذر المستودع (نفس سلوك Coolify)
-docker compose -f deploy/docker-compose.staging.yml --project-directory . --env-file .env.staging up -d --build
+# مرّر --project-directory . حتى يشير سياق البناء (.) إلى جذر المستودع (نفس سلوك Coolify).
+# على مضيف مستقل (بلا بروكسي مثل Coolify) أضِف compose.publish.yml لنشر منفذ الويب:
+docker compose -f deploy/docker-compose.staging.yml -f deploy/compose.publish.yml \
+  --project-directory . --env-file .env.staging up -d --build
 # الواجهة على http://localhost:8080  (تُمرّر /api داخليًا)
 docker compose -f deploy/docker-compose.staging.yml --project-directory . exec api pnpm --filter api run db:seed:ci
 ```

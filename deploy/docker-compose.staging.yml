@@ -72,8 +72,13 @@ services:
       - api
     environment:
       API_UPSTREAM: http://api:3001
-    ports:
-      - "${WEB_PORT:-8080}:80"
+    # Coolify routes the domain you assign in its UI (e.g. https://lam.nx.sa) to this
+    # container's port 80 through its built-in proxy — do NOT publish a host port here,
+    # or it collides with the proxy ("Bind for 0.0.0.0:8080 failed: port already allocated").
+    # For a standalone Docker host (no Coolify proxy), publish it via an override file, e.g.:
+    #   docker compose -f deploy/docker-compose.staging.yml -f deploy/compose.publish.yml ... up
+    expose:
+      - "80"
 
 volumes:
   fleet_pg_data:
