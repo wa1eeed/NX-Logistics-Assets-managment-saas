@@ -483,18 +483,70 @@ async function resyncRoles() {
   console.log(`Roles re-sync complete (${tenants.length} tenant(s)).`);
 }
 
+/**
+ * Populate the live tracking console for a demo/test: activate the tracking add-on,
+ * enable a handful of vehicles, and inject recent location pings spread across Saudi
+ * cities (a short trail each, so the trip-path feature also has data). Lets you SEE
+ * the map + vehicle panels working without real GPS hardware. Tenant via DEMO_TRACKING_SLUG.
+ */
+async function demoTracking() {
+  const slug = process.env.DEMO_TRACKING_SLUG ?? 'alrawaf';
+  const tenant = await prisma.tenant.findUnique({ where: { slug } });
+  if (!tenant) throw new Error(`Tenant "${slug}" not found`);
+  console.log(`Seeding demo tracking data for "${tenant.name}" …`);
+
+  await prisma.trackingAddon.upsert({
+    where: { tenantId: tenant.id },
+    create: { tenantId: tenant.id, source: 'ADDON', vehicleQuota: 25, perVehiclePrice: 15, status: 'ACTIVE', activatedAt: new Date() },
+    update: { vehicleQuota: 25, status: 'ACTIVE' },
+  });
+
+  const vehicles = await prisma.asset.findMany({
+    where: { tenantId: tenant.id, deletedAt: null, meterType: 'KM' },
+    take: 8, orderBy: { code: 'asc' }, select: { id: true, code: true },
+  });
+  if (vehicles.length === 0) { console.log('  ⚠ no vehicles found — nothing to enable'); return; }
+
+  const CITIES = [
+    { lat: 24.7136, lng: 46.6753 }, { lat: 21.4858, lng: 39.1925 }, { lat: 26.4207, lng: 50.0888 },
+    { lat: 21.3891, lng: 39.8579 }, { lat: 24.4686, lng: 39.6142 }, { lat: 26.0667, lng: 43.9333 },
+    { lat: 28.3838, lng: 36.5550 }, { lat: 18.2465, lng: 42.5117 },
+  ];
+  const now = Date.now();
+  const jit = () => (Math.random() - 0.5) * 0.06;
+  let i = 0;
+  for (const v of vehicles) {
+    await prisma.asset.update({ where: { id: v.id }, data: { trackingEnabled: true } });
+    const c = CITIES[i % CITIES.length];
+    for (let k = 4; k >= 0; k--) {
+      await prisma.locationPing.create({
+        data: {
+          tenantId: tenant.id, assetId: v.id,
+          lat: c.lat + jit() + k * 0.004, lng: c.lng + jit() + k * 0.004,
+          speed: 40 + Math.round(Math.random() * 40), source: 'HARDWARE',
+          recordedAt: new Date(now - k * 3 * 60_000), // newest = now → ONLINE
+        },
+      });
+    }
+    i++;
+  }
+  console.log(`  ✓ enabled ${vehicles.length} vehicles + recent pings across Saudi cities`);
+  console.log('Demo tracking ready — open the Tracking map.');
+}
+
 async function main() {
   const mode = (process.env.SEED_MODE ?? 'bootstrap').toLowerCase();
   if (mode === 'bootstrap') return bootstrap();
   if (mode === 'onboard') return onboard();
   if (mode === 'resync-roles') return resyncRoles();
+  if (mode === 'demo-tracking') return demoTracking();
   if (mode === 'full') {
     // Local-dev convenience: platform + a fully-populated demo subscriber.
     await bootstrap();
     await onboard({ devDefaults: true });
     return;
   }
-  throw new Error(`Unknown SEED_MODE "${mode}" (expected: bootstrap | onboard | resync-roles | full)`);
+  throw new Error(`Unknown SEED_MODE "${mode}" (expected: bootstrap | onboard | resync-roles | demo-tracking | full)`);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); }).finally(() => prisma.$disconnect());

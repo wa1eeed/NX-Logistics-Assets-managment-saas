@@ -17,6 +17,7 @@
     "db:seed:ci": "prisma db seed --schema ../../prisma/schema.prisma",
     "onboard:ci": "SEED_MODE=onboard prisma db seed --schema ../../prisma/schema.prisma",
     "roles:resync:ci": "SEED_MODE=resync-roles prisma db seed --schema ../../prisma/schema.prisma",
+    "demo:tracking:ci": "SEED_MODE=demo-tracking prisma db seed --schema ../../prisma/schema.prisma",
     "prisma:studio": "dotenv -e ../../.env -- prisma studio --schema ../../prisma/schema.prisma",
     "db:seed": "dotenv -e ../../.env -- prisma db seed --schema ../../prisma/schema.prisma",
     "db:seed:full": "SEED_MODE=full dotenv -e ../../.env -- prisma db seed --schema ../../prisma/schema.prisma"
