@@ -36,7 +36,7 @@ export const ROLES: RoleDef[] = [
     // admin manages the platform and impersonates a tenant to view its data.
     permissions: [
       'platform.tenants.read', 'platform.tenants.manage', 'platform.impersonate',
-      'entitlements.manage', 'payments.manage',
+      'entitlements.manage', 'payments.manage', 'maps.manage',
     ],
   },
   {
@@ -145,6 +145,7 @@ export const PLATFORM_RESERVED_PERMISSIONS: string[] = [
   'platform.tenants.manage',
   'platform.impersonate',
   'payments.manage',
+  'maps.manage',
 ];
 
 /**

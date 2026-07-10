@@ -3,8 +3,10 @@ import type { ComponentType, ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight, Building2, Clock, Truck, User, Package, MapPin } from 'lucide-react';
-import type { ConsoleVehicle, ConsoleTask, TrackingConsole, LookupItem, VehicleStatus } from '@nx-lam/shared';
+import type { ConsoleVehicle, ConsoleTask, TrackingConsole, LookupItem, VehicleStatus, GeofenceDto } from '@nx-lam/shared';
 import { ConsoleMap } from '../../components/ConsoleMap';
+import { ConsoleGoogleMap } from '../../components/maps/ConsoleGoogleMap';
+import { useMapsKey } from '../../lib/maps';
 import { api, LIVE_REFETCH_MS } from '../../lib/api';
 import { cn } from '../../lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
@@ -25,6 +27,8 @@ export function TrackingMapPage() {
   const statusQ = useTrackingStatus();
   const consoleQ = useQuery({ queryKey: ['tracking-console'], queryFn: async () => (await api.get<TrackingConsole>('/tracking/console')).data, refetchInterval: LIVE_REFETCH_MS, enabled: !!statusQ.data?.enabled });
   const regionsQ = useQuery({ queryKey: ['lookups', 'REGION'], queryFn: async () => (await api.get<LookupItem[]>('/lookups', { params: { type: 'REGION' } })).data, staleTime: 60_000 });
+  const { apiKey } = useMapsKey();
+  const fencesQ = useQuery({ queryKey: ['geofences'], queryFn: async () => (await api.get<GeofenceDto[]>('/tracking/geofences')).data, enabled: !!statusQ.data?.enabled });
 
   const st = statusQ.data;
   const cons = consoleQ.data ?? { vehicles: [], tasks: [] };
@@ -51,7 +55,11 @@ export function TrackingMapPage() {
   return (
     // Full-bleed: cancel <main> padding and fill the viewport below the 64px header.
     <div className="relative -m-4 h-[calc(100vh-4rem)] overflow-hidden sm:-m-6">
-      <div className="absolute inset-0"><ConsoleMap vehicles={cityVehicles} tasks={cityTasks} focus={mapFocus} /></div>
+      <div className="absolute inset-0">
+        {apiKey
+          ? <ConsoleGoogleMap apiKey={apiKey} vehicles={cityVehicles} tasks={cityTasks} fences={fencesQ.data ?? []} focus={mapFocus} />
+          : <ConsoleMap vehicles={cityVehicles} tasks={cityTasks} focus={mapFocus} />}
+      </div>
 
       {st && !st.enabled && (
         <div className="absolute inset-0 z-[1200] grid place-items-center bg-background/85 p-6 backdrop-blur-sm">

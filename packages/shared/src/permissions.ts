@@ -89,6 +89,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { key: 'platform.tenants.manage', group: 'platform', labelEn: 'Manage tenants (platform)', labelAr: 'إدارة الشركات (المنصّة)', descEn: 'Platform-admin only: onboard, suspend or reactivate companies.', descAr: 'لأدمن المنصّة فقط: إضافة الشركات وتعليقها وإعادة تفعيلها.' },
   { key: 'platform.impersonate', group: 'platform', labelEn: 'Impersonate a tenant (support)', labelAr: 'انتحال شركة (الدعم)', descEn: 'Platform-admin only: sign in as a company’s admin for support.', descAr: 'لأدمن المنصّة فقط: الدخول كمدير شركة لأغراض الدعم.' },
   { key: 'payments.manage', group: 'platform', labelEn: 'Manage payment gateway (platform)', labelAr: 'إدارة بوابة الدفع (المنصّة)', descEn: 'Platform-admin only: configure the Tap payment gateway account (keys, currency).', descAr: 'لأدمن المنصّة فقط: ضبط حساب بوابة الدفع Tap (المفاتيح والعملة).' },
+  { key: 'maps.manage', group: 'platform', labelEn: 'Manage maps provider (platform)', labelAr: 'إدارة مزوّد الخرائط (المنصّة)', descEn: 'Platform-admin only: configure the Google Maps API key used by all tenants.', descAr: 'لأدمن المنصّة فقط: ضبط مفتاح خرائط قوقل المستخدَم لكل المستأجرين.' },
 ];
 
 export const PERMISSION_KEYS = PERMISSIONS.map((p) => p.key);

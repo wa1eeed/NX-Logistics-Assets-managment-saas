@@ -1,11 +1,11 @@
 import { useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Building2, Plus, Pause, Play, SlidersHorizontal, LogIn, Users, HardDrive, Boxes, DollarSign, Activity, CreditCard, CheckCircle2, XCircle, Ban, Layers, Pencil } from 'lucide-react';
+import { Building2, Plus, Pause, Play, SlidersHorizontal, LogIn, Users, HardDrive, Boxes, DollarSign, Activity, CreditCard, CheckCircle2, XCircle, Ban, Layers, Pencil, MapPinned } from 'lucide-react';
 import {
   MODULE_LABELS, PLATFORM_MODULES, INTEGRATION_STATUSES, type PlatformModule,
   type LoginResponse, type PaymentGatewaySettings, type PlanDto, type InvoiceSeller, type IntegrationRequestDto, type IntegrationStatus,
-  type PlatformAuditItem, type PlatformOverview, type PlatformTenantSummary,
+  type PlatformAuditItem, type PlatformOverview, type PlatformTenantSummary, type MapsGatewaySettings,
 } from '@nx-lam/shared';
 import { api, extractApiError, tokenStore, LIVE_REFETCH_MS } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
@@ -40,6 +40,7 @@ export function PlatformPage() {
   const canImpersonate = hasPermission('platform.impersonate');
   const canBilling = hasPermission('entitlements.manage');
   const canPayments = hasPermission('payments.manage');
+  const canMaps = hasPermission('maps.manage');
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<PlatformTenantSummary | null>(null);
 
@@ -135,6 +136,8 @@ export function PlatformPage() {
       {canBilling && <div className="mb-5"><PlatformPlansCard /></div>}
 
       {canPayments && <div className="mb-5"><PlatformPaymentsCard /></div>}
+
+      {canMaps && <div className="mb-5"><PlatformMapsCard /></div>}
 
       {canPayments && <div className="mb-5"><PlatformSellerCard /></div>}
 
@@ -403,6 +406,62 @@ function PlatformPaymentsCard() {
           <Button onClick={() => { setMsg(null); save.mutate(); }} disabled={save.isPending}>{save.isPending ? t('common.saving') : t('payments.save')}</Button>
           <Button variant="outline" onClick={() => { setMsg(null); test.mutate(); }} disabled={test.isPending || !q.data?.secretSet}>{t('payments.testBtn')}</Button>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PlatformMapsCard() {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ['maps-config'], queryFn: async () => (await api.get<MapsGatewaySettings>('/maps/config')).data });
+  const [enabled, setEnabled] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+  const [loaded, setLoaded] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // hydrate once (the key is never returned — left blank)
+  if (q.data && !loaded) { setEnabled(q.data.enabled); setLoaded(true); }
+
+  const save = useMutation({
+    mutationFn: () => api.put<MapsGatewaySettings>('/maps/config', { enabled, ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}) }),
+    onSuccess: () => {
+      setApiKey('');
+      setMsg({ ok: true, text: t('maps.saved') });
+      void qc.invalidateQueries({ queryKey: ['maps-config'] });
+      void qc.invalidateQueries({ queryKey: ['maps-runtime'] });
+    },
+    onError: (e) => setMsg({ ok: false, text: extractApiError(e) }),
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <MapPinned className="h-4 w-4 text-primary" />{t('maps.gateway')}
+          {q.data && (q.data.apiKeySet
+            ? <Badge variant="outline" className="gap-1"><CheckCircle2 className="h-3 w-3 text-success" />{t('maps.keySet')}</Badge>
+            : <Badge variant="outline" className="gap-1"><XCircle className="h-3 w-3 text-muted-foreground" />{t('maps.keyMissing')}</Badge>)}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <p className="text-sm text-muted-foreground">{t('maps.gatewayHint')}</p>
+        {msg && (
+          <div className={cn('flex items-center gap-2 rounded-md border px-3 py-2 text-sm', msg.ok ? 'border-success/30 bg-success/10 text-success' : 'border-destructive/30 bg-destructive/10 text-destructive')}>
+            {msg.text}
+          </div>
+        )}
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" className="h-4 w-4 accent-primary" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+          <span>{t('maps.enabled')}</span>
+          <span className="text-xs text-muted-foreground">— {t('maps.enabledHint')}</span>
+        </label>
+        <div className="space-y-1.5">
+          <Label>{t('maps.apiKey')}</Label>
+          <Input dir="ltr" type="password" placeholder={q.data?.apiKeySet ? '••••••••  ' + t('maps.keyKeep') : 'AIza…'} value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
+        </div>
+        <p className="text-xs text-muted-foreground">{t('maps.docsHint')}</p>
+        <Button onClick={() => { setMsg(null); save.mutate(); }} disabled={save.isPending}>{save.isPending ? t('common.saving') : t('common.save')}</Button>
       </CardContent>
     </Card>
   );
