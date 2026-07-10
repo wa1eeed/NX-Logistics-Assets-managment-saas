@@ -62,7 +62,8 @@ export default function App() {
         <Route path="/terms" element={<LegalPage doc="terms" />} />
         <Route path="/privacy" element={<LegalPage doc="privacy" />} />
         <Route path="/contact" element={<LegalPage doc="contact" />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Logged-out access to any app route (e.g. after logout or an expired session) → login. */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
   }

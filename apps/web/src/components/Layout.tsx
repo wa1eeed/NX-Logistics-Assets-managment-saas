@@ -216,7 +216,7 @@ export function Layout() {
                   <UserCircle className="h-4 w-4" />
                   {t('nav.profile')}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={logout} className="text-destructive">
+                <DropdownMenuItem onClick={() => { logout(); navigate('/login'); }} className="text-destructive">
                   <LogOut className="h-4 w-4" />
                   {t('common.logout')}
                 </DropdownMenuItem>
