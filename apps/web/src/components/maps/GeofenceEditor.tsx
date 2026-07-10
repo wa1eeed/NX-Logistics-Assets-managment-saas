@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { GoogleMap, useJsApiLoader, DrawingManager, Circle, Polygon } from '@react-google-maps/api';
 import { useMutation } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -6,7 +6,7 @@ import { MapPin, Trash2, Circle as CircleIcon, Hexagon, X, Check } from 'lucide-
 import type { GeofenceDto } from '@nx-lam/shared';
 import { api } from '../../lib/api';
 import { cn } from '../../lib/utils';
-import { DEFAULT_MAP_CENTER, GOOGLE_MAPS_LIBRARIES, circleOf, polygonOf } from '../../lib/maps';
+import { DEFAULT_MAP_CENTER, GOOGLE_MAPS_LIBRARIES, circleOf, polygonOf, markGoogleMapsFailed } from '../../lib/maps';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
@@ -32,7 +32,8 @@ export function GeofenceEditor({ apiKey, fences, canManage, onChange, onErr }: {
   onErr: (e: unknown) => void;
 }) {
   const { t } = useTranslation();
-  const { isLoaded } = useJsApiLoader({ id: 'nxlam-gmaps', googleMapsApiKey: apiKey, libraries: GOOGLE_MAPS_LIBRARIES });
+  const { isLoaded, loadError } = useJsApiLoader({ id: 'nxlam-gmaps', googleMapsApiKey: apiKey, libraries: GOOGLE_MAPS_LIBRARIES });
+  useEffect(() => { if (loadError) markGoogleMapsFailed(); }, [loadError]);
   const [mode, setMode] = useState<'idle' | 'CIRCLE' | 'POLYGON'>('idle');
   const [pending, setPending] = useState<Pending | null>(null);
   const [name, setName] = useState('');

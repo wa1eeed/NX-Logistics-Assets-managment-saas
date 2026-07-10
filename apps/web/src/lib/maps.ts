@@ -1,6 +1,24 @@
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { GeofenceDto, MapsRuntime } from '@nx-lam/shared';
 import { api } from './api';
+
+// ---- Google Maps runtime health: fall back to Leaflet if the key is rejected ----
+// Google calls window.gm_authFailure on an invalid key / disabled billing / exhausted
+// quota. Once that (or a script load error) happens, we flip a flag so every map
+// switches to the free OpenStreetMap/Leaflet layer for the rest of the session.
+let googleFailed = false;
+const failListeners = new Set<() => void>();
+
+export function markGoogleMapsFailed(): void {
+  if (googleFailed) return;
+  googleFailed = true;
+  failListeners.forEach((fn) => fn());
+}
+
+if (typeof window !== 'undefined') {
+  (window as unknown as { gm_authFailure?: () => void }).gm_authFailure = markGoogleMapsFailed;
+}
 
 export type LatLng = { lat: number; lng: number };
 
@@ -20,7 +38,15 @@ export function useMapsKey(): { apiKey: string | null; loading: boolean } {
     queryFn: async () => (await api.get<MapsRuntime>('/maps/runtime')).data,
     staleTime: 5 * 60_000,
   });
-  return { apiKey: q.data?.apiKey ?? null, loading: q.isLoading };
+  // Re-render into Leaflet fallback if Google Maps auth/quota fails mid-session.
+  const [failed, setFailed] = useState(googleFailed);
+  useEffect(() => {
+    if (googleFailed) { setFailed(true); return; }
+    const fn = () => setFailed(true);
+    failListeners.add(fn);
+    return () => { failListeners.delete(fn); };
+  }, []);
+  return { apiKey: failed ? null : q.data?.apiKey ?? null, loading: q.isLoading };
 }
 
 // ---- geofence geo (our stored JSON) <-> lat/lng helpers ----

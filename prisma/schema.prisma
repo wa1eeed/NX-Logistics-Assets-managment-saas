@@ -242,6 +242,7 @@ model Model {
 
 model Asset {
   tenantId String? // المستأجر (Tenant) — عزل البيانات
+  geoZoneIds    Json?         // النطاقات التي يقع داخلها الأصل حالياً (لاكتشاف الدخول/الخروج)
   id            String        @id @default(cuid())
   code          String        // الرقم التسلسلي/التعريفي (فريد لكل مستأجر)
   assetTypeId   String
@@ -726,6 +727,25 @@ model Geofence {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId])
+}
+
+// حدث دخول/خروج أصل من نطاق جغرافي (يُنشَأ آلياً عند استقبال موقع جديد).
+model GeofenceEvent {
+  tenantId   String?
+  id         String   @id @default(cuid())
+  assetId    String
+  geofenceId String
+  type       String   // ENTER | EXIT
+  lat        Float
+  lng        Float
+  at         DateTime // وقت العبور (زمن الموقع المُستقبَل)
+  acknowledged Boolean @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([assetId])
+  @@index([geofenceId])
+  @@index([tenantId, at])
 }
 
 // إعدادات على مستوى المنصّة (غير مرتبطة بمستأجر) مثل حساب R2 المشترك.

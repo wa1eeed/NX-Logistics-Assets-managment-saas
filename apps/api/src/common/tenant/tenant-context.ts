@@ -19,6 +19,6 @@ export const TENANT_MODELS = new Set<string>([
   'Lookup', 'AuditLog',
   // SaaS guardrails — each tenant only sees its own subscription + storage ledger + wallet + storage config + payments + tracking.
   'TenantSubscription', 'StorageObject', 'WalletTransaction', 'TenantStorageConfig', 'PaymentIntent',
-  'TrackingAddon', 'TrackingDevice', 'LocationPing', 'Geofence', 'IntegrationRequest',
+  'TrackingAddon', 'TrackingDevice', 'LocationPing', 'Geofence', 'GeofenceEvent', 'IntegrationRequest',
   // Note: Setting stays platform-level (global) for now; per-tenant settings is a later step.
 ]);

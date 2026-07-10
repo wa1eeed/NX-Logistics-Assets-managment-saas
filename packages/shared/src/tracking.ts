@@ -45,6 +45,19 @@ export interface GeofenceDto {
   isActive: boolean;
 }
 
+/** An asset entering or leaving a geofence — recorded automatically on each location ping. */
+export interface GeofenceEventDto {
+  id: string;
+  assetId: string;
+  assetCode: string | null;
+  geofenceId: string;
+  geofenceName: string | null;
+  type: 'ENTER' | 'EXIT';
+  lat: number;
+  lng: number;
+  at: string;
+}
+
 /** Activate/extend the per-vehicle tracking add-on (paid by card). */
 export interface ActivateTrackingDto {
   vehicleQuota: number;

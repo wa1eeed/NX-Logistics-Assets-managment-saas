@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Circle, Polygon } from '@react-google-maps/api';
 import { useTranslation } from 'react-i18next';
 import type { ConsoleVehicle, ConsoleTask, GeofenceDto } from '@nx-lam/shared';
-import { DEFAULT_MAP_CENTER, GOOGLE_MAPS_LIBRARIES, circleOf, polygonOf } from '../../lib/maps';
+import { DEFAULT_MAP_CENTER, GOOGLE_MAPS_LIBRARIES, circleOf, polygonOf, markGoogleMapsFailed } from '../../lib/maps';
 
 const FENCE_STYLE = { fillColor: '#0ea5e9', fillOpacity: 0.08, strokeColor: '#0ea5e9', strokeWeight: 1.5, clickable: false } as const;
 
@@ -15,7 +15,8 @@ export function ConsoleGoogleMap({ apiKey, vehicles, tasks, fences, focus }: {
   focus: { lat: number; lng: number } | null;
 }) {
   const { t } = useTranslation();
-  const { isLoaded } = useJsApiLoader({ id: 'nxlam-gmaps', googleMapsApiKey: apiKey, libraries: GOOGLE_MAPS_LIBRARIES });
+  const { isLoaded, loadError } = useJsApiLoader({ id: 'nxlam-gmaps', googleMapsApiKey: apiKey, libraries: GOOGLE_MAPS_LIBRARIES });
+  useEffect(() => { if (loadError) markGoogleMapsFailed(); }, [loadError]);
   const mapRef = useRef<google.maps.Map | null>(null);
   const [open, setOpen] = useState<{ kind: 'v' | 't'; id: string } | null>(null);
 

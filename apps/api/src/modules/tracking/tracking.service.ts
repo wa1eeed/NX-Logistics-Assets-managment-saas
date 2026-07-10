@@ -1,11 +1,12 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type {
-  ConsoleVehicle, ConsoleTask, GeofenceDto, TrackedAssetDto, TrackingConsole, TrackingDeviceDto, TrackingProvider, TrackingStatusDto,
+  ConsoleVehicle, ConsoleTask, GeofenceDto, GeofenceEventDto, TrackedAssetDto, TrackingConsole, TrackingDeviceDto, TrackingProvider, TrackingStatusDto,
 } from '@nx-lam/shared';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
-import { currentTenantId } from '../../common/tenant/tenant-context';
+import { currentTenantId, tenantContext } from '../../common/tenant/tenant-context';
+import { isInsideGeofence } from './geofence-detect';
 
 const DEFAULT_PER_VEHICLE = 15;
 
@@ -251,6 +252,49 @@ export class TrackingService {
     return { id };
   }
 
+  /** Recent enter/exit events (newest first), enriched with asset code + zone name. */
+  async listGeofenceEvents(limit = 100): Promise<GeofenceEventDto[]> {
+    this.requireTenant();
+    const rows = await this.prisma.geofenceEvent.findMany({ orderBy: { at: 'desc' }, take: Math.min(Math.max(limit, 1), 500) });
+    if (rows.length === 0) return [];
+    const assetIds = [...new Set(rows.map((r) => r.assetId))];
+    const fenceIds = [...new Set(rows.map((r) => r.geofenceId))];
+    const [assets, fences] = await Promise.all([
+      this.prisma.asset.findMany({ where: { id: { in: assetIds } }, select: { id: true, code: true } }),
+      this.prisma.geofence.findMany({ where: { id: { in: fenceIds } }, select: { id: true, name: true } }),
+    ]);
+    const assetCode = new Map(assets.map((a) => [a.id, a.code]));
+    const fenceName = new Map(fences.map((f) => [f.id, f.name]));
+    return rows.map((r) => ({
+      id: r.id, assetId: r.assetId, assetCode: assetCode.get(r.assetId) ?? null,
+      geofenceId: r.geofenceId, geofenceName: fenceName.get(r.geofenceId) ?? null,
+      type: r.type as 'ENTER' | 'EXIT', lat: r.lat, lng: r.lng, at: r.at.toISOString(),
+    }));
+  }
+
+  /**
+   * Detect zone enter/exit for a single ping and record GeofenceEvents. MUST run
+   * inside the device's tenant context (so geofences/asset/events are scoped).
+   * Compares the fences the point is now inside against the asset's stored set.
+   */
+  private async detectZoneTransitions(assetId: string, lat: number, lng: number, at: Date): Promise<void> {
+    const fences = await this.prisma.geofence.findMany({ where: { isActive: true }, select: { id: true, type: true, geo: true } });
+    if (fences.length === 0) return;
+    const inside = fences.filter((f) => isInsideGeofence(f.type, f.geo as Record<string, unknown>, lat, lng)).map((f) => f.id);
+    const asset = await this.prisma.asset.findFirst({ where: { id: assetId }, select: { geoZoneIds: true } });
+    if (!asset) return;
+    const prev = Array.isArray(asset.geoZoneIds) ? (asset.geoZoneIds as string[]) : [];
+    const entered = inside.filter((id) => !prev.includes(id));
+    const exited = prev.filter((id) => !inside.includes(id));
+    if (entered.length === 0 && exited.length === 0) return;
+    const events = [
+      ...entered.map((geofenceId) => ({ assetId, geofenceId, type: 'ENTER', lat, lng, at })),
+      ...exited.map((geofenceId) => ({ assetId, geofenceId, type: 'EXIT', lat, lng, at })),
+    ];
+    await this.prisma.geofenceEvent.createMany({ data: events });
+    await this.prisma.asset.updateMany({ where: { id: assetId }, data: { geoZoneIds: inside as Prisma.InputJsonValue } });
+  }
+
   // ---- ingest (PUBLIC; authenticated by per-device HMAC) ----
 
   /**
@@ -274,6 +318,15 @@ export class TrackingService {
       },
     });
     await this.prisma.trackingDevice.update({ where: { id: device.id }, data: { lastSeenAt: new Date() } });
+    // Zone enter/exit detection — scoped to the device's tenant, and never allowed
+    // to fail the ingest (the ping is already recorded).
+    if (device.tenantId) {
+      try {
+        await tenantContext.run({ tenantId: device.tenantId }, () =>
+          this.detectZoneTransitions(device.assetId, body.lat, body.lng, new Date(recordedAt)),
+        );
+      } catch { /* swallow — detection is a side-effect */ }
+    }
     return { ok: true };
   }
 
