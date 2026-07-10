@@ -983,6 +983,7 @@ export const ar: TranslationShape = {
       SUPPLY_SHORTAGE: 'طلب غير ملبّى',
       INSURANCE_EXPIRY: 'انتهاء التأمين',
       PREVENTIVE_DUE: 'صيانة وقائية مستحقّة',
+      GEOFENCE_EVENT: 'دخول/خروج نطاق',
     },
   },
   commissioning: {

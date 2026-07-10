@@ -496,7 +496,7 @@ export interface DriverSummary {
 export type AlertKind =
   | 'DOC_EXPIRY' | 'REGISTRATION_EXPIRY' | 'INSPECTION_EXPIRY' | 'CONTRACT_EXPIRY'
   | 'LEASE_EXPIRY' | 'DRIVER_DOC_EXPIRY' | 'MAINTENANCE_COST' | 'SUPPLY_SHORTAGE'
-  | 'INSURANCE_EXPIRY' | 'PREVENTIVE_DUE';
+  | 'INSURANCE_EXPIRY' | 'PREVENTIVE_DUE' | 'GEOFENCE_EVENT';
 
 export interface AlertItem {
   kind: AlertKind;

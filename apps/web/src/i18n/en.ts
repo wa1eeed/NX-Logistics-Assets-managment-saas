@@ -981,6 +981,7 @@ export const en = {
       SUPPLY_SHORTAGE: 'Unmet request',
       INSURANCE_EXPIRY: 'Insurance expiry',
       PREVENTIVE_DUE: 'Preventive maintenance due',
+      GEOFENCE_EVENT: 'Zone entry/exit',
     },
   },
   commissioning: {

@@ -189,6 +189,37 @@ export class AlertsService {
       }
     }
 
+    // Geofence enter/exit events in the recent window → operational alerts (+ digest email).
+    const geoDays = await this.threshold('alerts.geofenceEventDays', 2);
+    const geoEvents = await this.prisma.geofenceEvent.findMany({
+      where: { at: { gte: new Date(now - geoDays * DAY) } },
+      orderBy: { at: 'desc' },
+      take: 100,
+    });
+    if (geoEvents.length) {
+      const aIds = [...new Set(geoEvents.map((e) => e.assetId))];
+      const fIds = [...new Set(geoEvents.map((e) => e.geofenceId))];
+      const [assets, fences] = await Promise.all([
+        this.prisma.asset.findMany({ where: { id: { in: aIds } }, select: { id: true, code: true } }),
+        this.prisma.geofence.findMany({ where: { id: { in: fIds } }, select: { id: true, name: true } }),
+      ]);
+      const code = new Map(assets.map((a) => [a.id, a.code]));
+      const fname = new Map(fences.map((f) => [f.id, f.name]));
+      for (const e of geoEvents) {
+        const zone = fname.get(e.geofenceId) ?? '—';
+        push({
+          kind: 'GEOFENCE_EVENT',
+          severity: 'warning',
+          title: e.type === 'ENTER' ? `Entered zone: ${zone}` : `Left zone: ${zone}`,
+          reference: code.get(e.assetId) ?? e.assetId,
+          date: e.at.toISOString(),
+          daysRemaining: -Math.max(0, Math.floor((now - e.at.getTime()) / DAY)),
+          entityType: 'Asset',
+          entityId: e.assetId,
+        });
+      }
+    }
+
     items.sort((a, b) => (a.daysRemaining ?? 0) - (b.daysRemaining ?? 0));
     return {
       generatedAt: new Date().toISOString(),
