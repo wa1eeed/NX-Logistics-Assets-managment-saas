@@ -1236,6 +1236,8 @@ export const ar: TranslationShape = {
     days: 'يوماً',
     none: 'لا توجد معدات بالعهدة',
     within: 'خلال {{n}} يوماً',
+    handover: 'الفحص والتسليم',
+    returnHint: 'يلزم فحص إرجاع أولاً — استخدم «الفحص والتسليم» لتسجيله ثم سلّم. هل تريد المتابعة؟',
   },
   requestStatus: {
     PENDING: 'معلّق',

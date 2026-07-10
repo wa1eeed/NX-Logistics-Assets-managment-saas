@@ -1235,6 +1235,8 @@ export const en = {
     days: 'days',
     none: 'No equipment in custody',
     within: 'within {{n}} days',
+    handover: 'Inspect / hand over',
+    returnHint: 'A return inspection is required first — use “Inspect / hand over” to record it, then return. Continue?',
   },
   requestStatus: {
     PENDING: 'Pending',

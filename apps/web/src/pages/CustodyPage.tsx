@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Plus, CalendarPlus, Undo2, Boxes, Clock, AlertTriangle, Truck, Search } from 'lucide-react';
+import { Plus, CalendarPlus, Undo2, Boxes, Clock, AlertTriangle, Truck, Search, ClipboardCheck } from 'lucide-react';
 import type { CustodyView, RentalContractSummary } from '@nx-lam/shared';
 import { api, extractApiError, LIVE_REFETCH_MS } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
@@ -10,6 +10,7 @@ import { PageHeader } from '../components/PageHeader';
 import { GlowCard } from '../components/effects/GlowCard';
 import { AnimatedNumber } from '../components/effects/AnimatedNumber';
 import { CreateRequestModal, ExtendModal } from '../components/rentals/modals';
+import { HandoverDialog } from '../components/rentals/HandoverDialog';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
@@ -24,6 +25,7 @@ export function CustodyPage() {
   const q = useQuery({ queryKey: ['custody'], queryFn: async () => (await api.get<CustodyView>('/rentals/contracts/custody')).data, refetchInterval: LIVE_REFETCH_MS });
   const [requesting, setRequesting] = useState(false);
   const [extending, setExtending] = useState<RentalContractSummary | null>(null);
+  const [inspecting, setInspecting] = useState<RentalContractSummary | null>(null);
   const [search, setSearch] = useState('');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -125,10 +127,15 @@ export function CustodyPage() {
                 </div>
 
                 {(canExtend || canReturn) && (
-                  <div className="mt-4 flex justify-end gap-2">
+                  <div className="mt-4 flex flex-wrap justify-end gap-2">
                     {canExtend && <Button variant="outline" size="sm" onClick={() => setExtending(c)}><CalendarPlus className="h-3.5 w-3.5" />{t('rentals.extend')}</Button>}
                     {canReturn && (
-                      <Button variant="outline" size="sm" onClick={async () => { if (await confirm({ title: t('rentals.return'), description: t('rentals.confirmReturn'), confirmText: t('rentals.return') })) ret.mutate(c.id); }}>
+                      <Button variant="outline" size="sm" onClick={() => setInspecting(c)}>
+                        <ClipboardCheck className="h-3.5 w-3.5" />{t('custody.handover')}
+                      </Button>
+                    )}
+                    {canReturn && (
+                      <Button variant="outline" size="sm" onClick={async () => { if (await confirm({ title: t('rentals.return'), description: t('custody.returnHint'), confirmText: t('rentals.return') })) ret.mutate(c.id); }}>
                         <Undo2 className="h-3.5 w-3.5" />{t('rentals.return')}
                       </Button>
                     )}
@@ -144,6 +151,7 @@ export function CustodyPage() {
 
       {requesting && <CreateRequestModal onClose={() => setRequesting(false)} onSaved={() => { setRequesting(false); invalidate(); }} />}
       {extending && <ExtendModal contract={extending} onClose={() => setExtending(null)} onSaved={() => { setExtending(null); invalidate(); }} />}
+      {inspecting && <HandoverDialog contract={inspecting} onClose={() => { setInspecting(null); invalidate(); }} />}
     </div>
   );
 }
