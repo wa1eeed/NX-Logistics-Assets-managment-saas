@@ -77,8 +77,8 @@ pnpm --filter @nx-lam/shared dev   # مراقبة حزمة الأنواع الم
 | موظف تسجيل الأصول (UNIT_OPERATOR) | `registrar@nx-lam.local` | `Staff@12345` | وحدة التسجيل |
 | المعتمِد (UNIT_APPROVER) | `approver@nx-lam.local` | `Staff@12345` | إدارة الأصول |
 | فنّي الصيانة (MAINTENANCE) | `tech@nx-lam.local` | `Staff@12345` | إدارة الصيانة |
-| مدير مشروع ألفا (PROJECT_MANAGER) | `pm@nx-lam.local` | `Pm@12345` | Project Alpha — Riyadh |
-| مدير مشروع بيتا (PROJECT_MANAGER) | `pm.beta@nx-lam.local` | `Pm@12345` | Project Beta — Jeddah |
+| مدير مشروع ألفا (PROJECT_MANAGER) | `pm1@nx-lam.local` | `Pm@12345` | Project Alpha — Riyadh |
+| مدير مشروع بيتا (PROJECT_MANAGER) | `pm2@nx-lam.local` | `Pm@12345` | Project Beta — Jeddah |
 
 > كل المستخدمين أنشأهم السوبر أدمن (إضافة الموظفين محصورة بالسوبر أدمن). كل دور يرى ما يخصّه فقط؛ الحقول المالية تظهر لمن يملك `finance.read`.
 > بيانات أدمن المشترك التجريبي قابلة للتغيير عبر `ONBOARD_ADMIN_EMAIL`/`ONBOARD_ADMIN_PASSWORD`، ومشغّل المنصّة عبر `SEED_PLATFORM_*`. حساب مدير المشروع لاختبار النطاق (Row-Level) — يرى مشروعه فقط ولا يصل لصفحات الإدارة.

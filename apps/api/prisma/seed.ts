@@ -439,18 +439,29 @@ async function onboard(opts: { devDefaults?: boolean } = {}) {
 
   await seedRealFleet(typeId);
 
-  if (demo) {
-    const org = await seedOrg();
-    await user('pm@nx-lam.local', 'PM — Project Alpha', 'Pm@12345', RoleName.PROJECT_MANAGER, org.alpha.id);
-    await user('pm.beta@nx-lam.local', 'PM — Project Beta', 'Pm@12345', RoleName.PROJECT_MANAGER, org.beta.id);
-    await user('asset.manager@nx-lam.local', 'Asset Dept Manager', 'Staff@12345', RoleName.DEPT_MANAGER, org.assetMgmt.id);
-    await user('dispatch@nx-lam.local', 'Dispatch Operator', 'Staff@12345', RoleName.DISPATCH, org.rentalUnit.id);
-    await user('registrar@nx-lam.local', 'Registration Operator', 'Staff@12345', RoleName.UNIT_OPERATOR, org.assetMgmt.id);
-    const approver = await user('approver@nx-lam.local', 'Sales Approver', 'Staff@12345', RoleName.UNIT_APPROVER, org.assetMgmt.id);
-    await user('tech@nx-lam.local', 'Maintenance Technician', 'Staff@12345', RoleName.MAINTENANCE, org.maintDept.id);
+  // Company structure + staff accounts — the real people who run the fleet.
+  // On by default (ONBOARD_WITH_STAFF=0 to skip). Staff emails derive from the
+  // admin's domain, e.g. admin@company.ex → asset.manager@company.ex …
+  let org: Awaited<ReturnType<typeof seedOrg>> | null = null;
+  let approver: Awaited<ReturnType<typeof user>> | null = null;
+  if (process.env.ONBOARD_WITH_STAFF !== '0') {
+    org = await seedOrg();
+    const domain = adminEmail.split('@')[1] ?? 'company.ex';
+    await user(`asset.manager@${domain}`, 'مدير إدارة الأصول', 'Staff@12345', RoleName.DEPT_MANAGER, org.assetMgmt.id);
+    await user(`dispatch@${domain}`, 'موظف النقليات والتأجير', 'Staff@12345', RoleName.DISPATCH, org.rentalUnit.id);
+    await user(`registrar@${domain}`, 'موظف تسجيل الأصول', 'Staff@12345', RoleName.UNIT_OPERATOR, org.assetMgmt.id);
+    approver = await user(`approver@${domain}`, 'المعتمِد', 'Staff@12345', RoleName.UNIT_APPROVER, org.assetMgmt.id);
+    await user(`tech@${domain}`, 'فنّي الصيانة', 'Staff@12345', RoleName.MAINTENANCE, org.maintDept.id);
+    await user(`pm1@${domain}`, 'مدير مشروع ألفا', 'Pm@12345', RoleName.PROJECT_MANAGER, org.alpha.id);
+    await user(`pm2@${domain}`, 'مدير مشروع بيتا', 'Pm@12345', RoleName.PROJECT_MANAGER, org.beta.id);
+    console.log(`  ✓ staff: 8 accounts (admin + 7 department/project roles) @${domain}`);
+  }
+
+  // Sample operational data (contracts / maintenance / sales / …) — local dev only.
+  if (demo && org && approver) {
     await seedOperations(org, admin, approver);
     await seedPreventive();
-    console.log('  ✓ demo org units + users + operations (SEED_DEMO)');
+    console.log('  ✓ demo operations + preventive (SEED_DEMO)');
   }
 
   await backfillTenant(tenant.id);
