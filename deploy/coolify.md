@@ -17,8 +17,11 @@
    (خصوصًا `POSTGRES_PASSWORD` و`JWT_*` و`WEB_PUBLIC_URL`).
 3. اربط الدومين/الساب-دومين بخدمة **web** (المنفذ 80 داخليًا)، وفعّل **TLS** من Coolify.
 4. Deploy. ترتيب أوّل إقلاع: db → api (يطبّق الترحيلات) → web.
-5. **تهيئة أوّل سوبر أدمن + البيانات المرجعية** (مرّة واحدة):
+5. **تهيئة المنصّة (bootstrap — مرّة واحدة):** يُنشئ **مشغّل المنصّة** (من `SEED_PLATFORM_*`) + الباقات + الصلاحيات فقط — بلا أي مستأجر:
    `docker compose -f deploy/docker-compose.staging.yml exec api pnpm --filter api run db:seed:ci`
+6. **إدخال أول مشترك (اختياري):** الشركات تسجّل ذاتيًا عبر `/register`. أو لتهيئة مشترك أولي ببياناته الحقيقية مرّة واحدة (بيانات دخوله تُمرَّر وقت التشغيل، لا تُخزَّن):
+   `docker compose -f deploy/docker-compose.staging.yml exec -e ONBOARD_ADMIN_EMAIL=admin@alrawaf.com -e ONBOARD_ADMIN_PASSWORD=<قوية> api pnpm --filter api run onboard:ci`
+   (يُنشئ الرواف كمستأجر نظيف + يستورد الأسطول الحقيقي. `ONBOARD_SLUG`/`ONBOARD_NAME` تُخصّص الشركة.)
 
 ## الطريقة (ب): خدمتان منفصلتان في Coolify + Postgres مُدار
 
@@ -28,7 +31,7 @@
    المنفذ الداخلي 3001.
 3. خدمة **web** ← `deploy/Dockerfile.web`. اضبط `API_UPSTREAM` على العنوان الداخلي لخدمة الـ api
    (مثلاً `http://api:3001` أو اسم خدمة الـ api في شبكة Coolify). اربط الدومين + TLS بهذه الخدمة.
-4. التهيئة الأولى للبذور: شغّل `pnpm --filter api run db:seed:ci` داخل حاوية الـ api مرّة واحدة.
+4. التهيئة الأولى: شغّل `pnpm --filter api run db:seed:ci` (bootstrap: مشغّل المنصّة + الباقات) داخل حاوية الـ api مرّة واحدة. ثم للمشترك الأولي: `ONBOARD_ADMIN_EMAIL=… ONBOARD_ADMIN_PASSWORD=… pnpm --filter api run onboard:ci`.
 
 ---
 
@@ -41,7 +44,8 @@ cp .env.staging.example .env.staging   # املأ POSTGRES_PASSWORD و JWT_* و 
 docker compose -f deploy/docker-compose.staging.yml -f deploy/compose.publish.yml \
   --project-directory . --env-file .env.staging up -d --build
 # الواجهة على http://localhost:8080  (تُمرّر /api داخليًا)
-docker compose -f deploy/docker-compose.staging.yml --project-directory . exec api pnpm --filter api run db:seed:ci
+# للتطوير المحلي: بذر كامل (منصّة + مشترك تجريبي ممتلئ بالعمليات) بأمر واحد:
+docker compose -f deploy/docker-compose.staging.yml --project-directory . exec api pnpm --filter api run db:seed:full
 ```
 
 ## الأسرار المطلوبة (Coolify Secrets — لا تُحفظ في git)
@@ -52,7 +56,7 @@ docker compose -f deploy/docker-compose.staging.yml --project-directory . exec a
 | `POSTGRES_PASSWORD` | ✅ (طريقة أ) | كلمة قوية |
 | `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | ✅ | `openssl rand -hex 32` لكلٍّ منهما |
 | `WEB_PUBLIC_URL` | ✅ | رابط staging العام (CORS + روابط عودة الدفع) |
-| `SEED_ADMIN_*` | موصى | حساب أوّل سوبر أدمن |
+| `SEED_PLATFORM_*` | موصى | بيانات دخول **مشغّل المنصّة** (الحساب الوحيد المبذور). المشتركون يسجّلون ذاتيًا أو عبر `onboard:ci` |
 | `R2_*`, `CDN_PUBLIC_BASE_URL` | اختياري | بدونها يُعطَّل رفع الملفات بلطف |
 | `RESEND_API_KEY`, `MAIL_FROM` | اختياري | بدونها يُعطَّل البريد/التنبيهات |
 | `TAP_SECRET_KEY` / `TAP_PUBLIC_KEY` | اختياري | تُدار فعليًا من «بوابة الدفع» في لوحة المنصّة؛ فراغها = ساندبوكس |

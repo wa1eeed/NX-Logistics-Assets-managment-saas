@@ -289,9 +289,7 @@ async function seedOperations(ctx: { rentalUnit: { id: string }; maintDept: { id
   console.log('  ✓ operations: contracts + requests + work orders + sales + leases + drivers (on real assets)');
 }
 
-async function seedTenant() {
-  const slug = process.env.SEED_TENANT_SLUG ?? 'alrawaf';
-  const name = process.env.SEED_TENANT_NAME ?? 'شركة الرواف';
+async function seedTenant(slug: string, name: string) {
   const tenant = await prisma.tenant.upsert({ where: { slug }, create: { slug, name, status: 'ACTIVE', code: 'TNT-0001' }, update: { name, code: 'TNT-0001' } });
   // Default subscription / guardrails (managed by the platform admin later).
   await prisma.tenantSubscription.upsert({
@@ -304,7 +302,7 @@ async function seedTenant() {
       maxStorageBytes: BigInt(DEFAULT_MAX_STORAGE_BYTES),
       enabledModules: DEFAULT_ENABLED_MODULES,
       seatPriceMonthly: 49,
-      walletBalance: 1000, // demo starting credit
+      walletBalance: 0,
     },
     // seed = reset to a known baseline (clears demo purchases on re-seed)
     update: {
@@ -313,7 +311,7 @@ async function seedTenant() {
       maxStorageBytes: BigInt(DEFAULT_MAX_STORAGE_BYTES),
       enabledModules: DEFAULT_ENABLED_MODULES,
       seatPriceMonthly: 49,
-      walletBalance: 1000,
+      walletBalance: 0,
     },
   });
   // Reset the wallet ledger so it matches the baseline balance on re-seed.
@@ -383,46 +381,93 @@ async function seedPreventive() {
   console.log('  ✓ preventive: maintenance plans on real assets (overdue/due-soon demo)');
 }
 
-async function main() {
-  console.log('Seeding NX-LAM (coherent dataset) …');
-  const tenant = await seedTenant();
+/**
+ * BOOTSTRAP — control-plane only. Creates the platform-level records that every
+ * deployment needs and NOTHING tenant-specific: permissions, the plan catalog, and
+ * the single platform operator (you) from SEED_PLATFORM_* env. No tenant, no fleet.
+ * This is what `prisma migrate reset` / `db seed` runs by default.
+ */
+async function bootstrap() {
+  console.log('Bootstrapping NX-LAM platform (control-plane only) …');
   await seedPermissions();
   await seedPlans();
+
+  // Platform/SaaS operator — Control-Plane identity in its OWN table (PlatformAdmin),
+  // deliberately NOT a tenant User, so a tenant-side compromise can't reach it.
+  const platformEmail = (process.env.SEED_PLATFORM_EMAIL ?? 'platform@nx-lam.local').toLowerCase();
+  const platformName = process.env.SEED_PLATFORM_NAME ?? 'Platform Operator';
+  const platformHash = await argon2.hash(process.env.SEED_PLATFORM_PASSWORD ?? 'Platform@12345');
+  await prisma.platformAdmin.upsert({
+    where: { email: platformEmail },
+    create: { email: platformEmail, fullName: platformName, passwordHash: platformHash, isActive: true },
+    update: { fullName: platformName, passwordHash: platformHash },
+  });
+  console.log(`  ✓ platform operator: ${platformEmail} (PlatformAdmin table, above all tenants)`);
+  console.log('Bootstrap complete.');
+}
+
+/**
+ * ONBOARD — provision a real subscriber (tenant) into the platform, exactly like any
+ * company that signs up. Creates the tenant + subscription + its own role set + one
+ * SUPER_ADMIN, its reference catalog (classes/types/brands/…), and imports the real
+ * fleet. Admin credentials are passed at runtime (ONBOARD_ADMIN_*), never baked into
+ * the repo or Coolify env. Clean by default; pass SEED_DEMO=1 (or devDefaults) to add
+ * sample org units + operations for local development.
+ */
+async function onboard(opts: { devDefaults?: boolean } = {}) {
+  const slug = process.env.ONBOARD_SLUG ?? 'alrawaf';
+  const name = process.env.ONBOARD_NAME ?? 'شركة الرواف';
+  const adminEmail = (process.env.ONBOARD_ADMIN_EMAIL ?? (opts.devDefaults ? 'admin@nx-lam.local' : '')).toLowerCase();
+  const adminPassword = process.env.ONBOARD_ADMIN_PASSWORD ?? (opts.devDefaults ? 'Admin@12345' : '');
+  const adminName = process.env.ONBOARD_ADMIN_NAME ?? 'مدير الشركة';
+  const demo = opts.devDefaults || process.env.SEED_DEMO === '1';
+  if (!adminEmail || !adminPassword) {
+    throw new Error('onboard: set ONBOARD_ADMIN_EMAIL and ONBOARD_ADMIN_PASSWORD (subscriber admin login)');
+  }
+
+  console.log(`Onboarding subscriber "${name}" (${slug}) …`);
+  const tenant = await seedTenant(slug, name);
   await provisionTenantRoles(prisma, tenant.id);
-  console.log(`  ✓ roles: ${ROLES.length - 1} per-tenant (excl. platform role)`);
-  const org = await seedOrg();
+  console.log(`  ✓ roles: ${ROLES.length - 1} per-tenant`);
   await seedLookups();
   const classId = await seedAssetClasses();
   const typeId = await seedAssetTypes(classId);
   await seedSettings();
 
-  // Users (all created by super admin; super-admin-only onboarding)
-  const admin = await user(process.env.SEED_ADMIN_EMAIL ?? 'admin@nx-lam.local', process.env.SEED_ADMIN_NAME ?? 'System Administrator', process.env.SEED_ADMIN_PASSWORD ?? 'Admin@12345', RoleName.SUPER_ADMIN, null);
-  await user('pm@nx-lam.local', 'PM — Project Alpha', 'Pm@12345', RoleName.PROJECT_MANAGER, org.alpha.id);
-  await user('pm.beta@nx-lam.local', 'PM — Project Beta', 'Pm@12345', RoleName.PROJECT_MANAGER, org.beta.id);
-  await user('asset.manager@nx-lam.local', 'Asset Dept Manager', 'Staff@12345', RoleName.DEPT_MANAGER, org.assetMgmt.id);
-  await user('dispatch@nx-lam.local', 'Dispatch Operator', 'Staff@12345', RoleName.DISPATCH, org.rentalUnit.id);
-  await user('registrar@nx-lam.local', 'Registration Operator', 'Staff@12345', RoleName.UNIT_OPERATOR, org.assetMgmt.id);
-  const approver = await user('approver@nx-lam.local', 'Sales Approver', 'Staff@12345', RoleName.UNIT_APPROVER, org.assetMgmt.id);
-  await user('tech@nx-lam.local', 'Maintenance Technician', 'Staff@12345', RoleName.MAINTENANCE, org.maintDept.id);
-  console.log('  ✓ users: 8 (super-admin-onboarded, department-scoped)');
+  const admin = await user(adminEmail, adminName, adminPassword, RoleName.SUPER_ADMIN, null);
+  console.log(`  ✓ subscriber admin: ${adminEmail} (SUPER_ADMIN)`);
 
   await seedRealFleet(typeId);
-  await seedOperations(org, admin, approver);
-  await seedPreventive();
-  await backfillTenant(tenant.id);
 
-  // Platform/SaaS operator — Control-Plane identity in its OWN table (PlatformAdmin),
-  // deliberately NOT a tenant User, so a tenant-side compromise can't reach it.
-  const platformEmail = (process.env.SEED_PLATFORM_EMAIL ?? 'platform@nx-lam.local').toLowerCase();
-  const platformHash = await argon2.hash(process.env.SEED_PLATFORM_PASSWORD ?? 'Platform@12345');
-  await prisma.platformAdmin.upsert({
-    where: { email: platformEmail },
-    create: { email: platformEmail, fullName: 'Platform Operator', passwordHash: platformHash, isActive: true },
-    update: { fullName: 'Platform Operator' },
-  });
-  console.log(`  ✓ platform operator: ${platformEmail} (PlatformAdmin table, above all tenants)`);
-  console.log('Seed complete.');
+  if (demo) {
+    const org = await seedOrg();
+    await user('pm@nx-lam.local', 'PM — Project Alpha', 'Pm@12345', RoleName.PROJECT_MANAGER, org.alpha.id);
+    await user('pm.beta@nx-lam.local', 'PM — Project Beta', 'Pm@12345', RoleName.PROJECT_MANAGER, org.beta.id);
+    await user('asset.manager@nx-lam.local', 'Asset Dept Manager', 'Staff@12345', RoleName.DEPT_MANAGER, org.assetMgmt.id);
+    await user('dispatch@nx-lam.local', 'Dispatch Operator', 'Staff@12345', RoleName.DISPATCH, org.rentalUnit.id);
+    await user('registrar@nx-lam.local', 'Registration Operator', 'Staff@12345', RoleName.UNIT_OPERATOR, org.assetMgmt.id);
+    const approver = await user('approver@nx-lam.local', 'Sales Approver', 'Staff@12345', RoleName.UNIT_APPROVER, org.assetMgmt.id);
+    await user('tech@nx-lam.local', 'Maintenance Technician', 'Staff@12345', RoleName.MAINTENANCE, org.maintDept.id);
+    await seedOperations(org, admin, approver);
+    await seedPreventive();
+    console.log('  ✓ demo org units + users + operations (SEED_DEMO)');
+  }
+
+  await backfillTenant(tenant.id);
+  console.log(`Onboarded "${name}" · ${tenant.code}. Admin login: ${adminEmail}`);
+}
+
+async function main() {
+  const mode = (process.env.SEED_MODE ?? 'bootstrap').toLowerCase();
+  if (mode === 'bootstrap') return bootstrap();
+  if (mode === 'onboard') return onboard();
+  if (mode === 'full') {
+    // Local-dev convenience: platform + a fully-populated demo subscriber.
+    await bootstrap();
+    await onboard({ devDefaults: true });
+    return;
+  }
+  throw new Error(`Unknown SEED_MODE "${mode}" (expected: bootstrap | onboard | full)`);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); }).finally(() => prisma.$disconnect());

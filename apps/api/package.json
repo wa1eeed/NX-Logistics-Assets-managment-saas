@@ -13,9 +13,12 @@
     "prisma:deploy": "dotenv -e ../../.env -- prisma migrate deploy --schema ../../prisma/schema.prisma",
     "prisma:generate:ci": "prisma generate --schema ../../prisma/schema.prisma",
     "prisma:deploy:ci": "prisma migrate deploy --schema ../../prisma/schema.prisma",
+    "prisma:reset:ci": "prisma migrate reset --force --schema ../../prisma/schema.prisma",
     "db:seed:ci": "prisma db seed --schema ../../prisma/schema.prisma",
+    "onboard:ci": "SEED_MODE=onboard prisma db seed --schema ../../prisma/schema.prisma",
     "prisma:studio": "dotenv -e ../../.env -- prisma studio --schema ../../prisma/schema.prisma",
-    "db:seed": "dotenv -e ../../.env -- prisma db seed --schema ../../prisma/schema.prisma"
+    "db:seed": "dotenv -e ../../.env -- prisma db seed --schema ../../prisma/schema.prisma",
+    "db:seed:full": "SEED_MODE=full dotenv -e ../../.env -- prisma db seed --schema ../../prisma/schema.prisma"
   },
   "prisma": {
     "schema": "../../prisma/schema.prisma",
