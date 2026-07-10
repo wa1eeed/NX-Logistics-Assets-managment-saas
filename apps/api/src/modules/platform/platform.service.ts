@@ -7,6 +7,7 @@ import {
   type TenantStatus, type UpdateTenantSubscriptionDto, type UpsertPlanDto,
 } from '@nx-lam/shared';
 import { PrismaService } from '../../prisma/prisma.service';
+import { assertEmailNotPlatformOperator } from '../../common/email-uniqueness';
 import { AuthService } from '../auth/auth.service';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { provisionTenantRoles } from '../rbac/provision-roles';
@@ -117,6 +118,8 @@ export class PlatformService {
     ]);
     if (slugTaken) throw new ConflictException('Slug already in use');
     if (emailTaken) throw new ConflictException('Admin email already in use');
+    // Reject an email that already belongs to a platform operator (would lock them out at login).
+    await assertEmailNotPlatformOperator(this.prisma, email);
 
     const count = await this.prisma.tenant.count();
     const code = `TNT-${String(count + 1).padStart(4, '0')}`;

@@ -9,6 +9,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { AccessService } from './access.service';
 import { AuthenticatedUser } from '../../common/types/authenticated-user';
+import { assertEmailNotPlatformOperator } from '../../common/email-uniqueness';
 import { provisionTenantRoles } from '../rbac/provision-roles';
 
 interface RefreshTokenPayload {
@@ -81,6 +82,8 @@ export class AuthService {
     ]);
     if (slugTaken) throw new ConflictException('This workspace address is already taken');
     if (emailTaken) throw new ConflictException('An account with this email already exists');
+    // …and free across the control-plane table too (see helper for why).
+    await assertEmailNotPlatformOperator(this.prisma, email);
 
     const count = await this.prisma.tenant.count();
     const code = `TNT-${String(count + 1).padStart(4, '0')}`;

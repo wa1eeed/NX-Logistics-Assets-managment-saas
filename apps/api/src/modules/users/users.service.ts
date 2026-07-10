@@ -8,6 +8,7 @@ import * as argon2 from 'argon2';
 import type { UserSummary } from '@nx-lam/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { currentTenantId } from '../../common/tenant/tenant-context';
+import { assertEmailNotPlatformOperator } from '../../common/email-uniqueness';
 import { EntitlementsService } from '../entitlements/entitlements.service';
 import { CreateUserDto, SetUserRolesDto, UpdateUserDto, RoleAssignmentDto } from './dto/user.dto';
 
@@ -45,6 +46,8 @@ export class UsersService {
     const email = dto.email.toLowerCase().trim();
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) throw new ConflictException('Email already in use');
+    // Also reject an email owned by a platform operator (cross-table uniqueness).
+    await assertEmailNotPlatformOperator(this.prisma, email);
 
     await this.validateAssignments(dto.roles ?? []);
     const passwordHash = await argon2.hash(dto.password);
