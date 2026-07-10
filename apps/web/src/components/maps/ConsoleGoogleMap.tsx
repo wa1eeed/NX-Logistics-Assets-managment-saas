@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Circle, Polygon } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow, Circle, Polygon, Polyline } from '@react-google-maps/api';
 import { useTranslation } from 'react-i18next';
 import type { ConsoleVehicle, ConsoleTask, GeofenceDto } from '@nx-lam/shared';
 import { DEFAULT_MAP_CENTER, GOOGLE_MAPS_LIBRARIES, circleOf, polygonOf, markGoogleMapsFailed } from '../../lib/maps';
@@ -7,12 +7,15 @@ import { DEFAULT_MAP_CENTER, GOOGLE_MAPS_LIBRARIES, circleOf, polygonOf, markGoo
 const FENCE_STYLE = { fillColor: '#0ea5e9', fillOpacity: 0.08, strokeColor: '#0ea5e9', strokeWeight: 1.5, clickable: false } as const;
 
 /** Live tracking map on Google Maps — vehicles + tasks as markers, geofences as overlays. */
-export function ConsoleGoogleMap({ apiKey, vehicles, tasks, fences, focus }: {
+export function ConsoleGoogleMap({ apiKey, vehicles, tasks, fences, focus, route, waypoints, onMapClick }: {
   apiKey: string;
   vehicles: ConsoleVehicle[];
   tasks: ConsoleTask[];
   fences?: GeofenceDto[];
   focus: { lat: number; lng: number } | null;
+  route?: [number, number][];
+  waypoints?: [number, number][];
+  onMapClick?: (lat: number, lng: number) => void;
 }) {
   const { t } = useTranslation();
   const { isLoaded, loadError } = useJsApiLoader({ id: 'nxlam-gmaps', googleMapsApiKey: apiKey, libraries: GOOGLE_MAPS_LIBRARIES });
@@ -54,8 +57,15 @@ export function ConsoleGoogleMap({ apiKey, vehicles, tasks, fences, focus }: {
       zoom={vLoc.length || tLoc.length ? 11 : 6}
       onLoad={(m) => { mapRef.current = m; }}
       onUnmount={() => { mapRef.current = null; }}
+      onClick={(e) => { if (onMapClick && e.latLng) onMapClick(e.latLng.lat(), e.latLng.lng()); }}
       options={{ streetViewControl: false, mapTypeControl: false, fullscreenControl: false }}
     >
+      {route && route.length > 1 && (
+        <Polyline path={route.map(([lat, lng]) => ({ lat, lng }))} options={{ strokeColor: '#f59e0b', strokeWeight: 5, strokeOpacity: 0.9 }} />
+      )}
+      {(waypoints ?? []).map(([lat, lng], i) => (
+        <Marker key={`wp-${i}`} position={{ lat, lng }} label={{ text: String(i + 1), color: '#fff', fontSize: '11px' }} />
+      ))}
       {(fences ?? []).map((f) => {
         const c = circleOf(f);
         if (c) return <Circle key={f.id} center={c.center} radius={c.radiusM} options={FENCE_STYLE} />;
