@@ -7,6 +7,7 @@ import type {
   AssetSummary, CheckoutResult, GeofenceDto, IntegrationRequestDto, TrackingStatusDto,
 } from '@nx-lam/shared';
 import { api, LIVE_REFETCH_MS } from '../../lib/api';
+import { useAuth } from '../../auth/AuthContext';
 import { StatTile } from '../../components/StatTile';
 import { cn } from '../../lib/utils';
 import { Button } from '../../components/ui/button';
@@ -60,15 +61,19 @@ export function StatusBand({ st }: { st: TrackingStatusDto }) {
 /** Shown on map/devices/geofences pages when the tracking add-on isn't active yet. */
 export function TrackingDisabledNotice() {
   const { t } = useTranslation();
+  const { hasPermission } = useAuth();
+  // Subscribing to the tracking add-on is billing — company admins only. Others
+  // are told to contact their admin, without the subscription link.
+  const canManage = hasPermission('billing.manage');
   return (
     <Card>
       <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
         <span className="grid h-14 w-14 place-items-center rounded-2xl bg-muted text-muted-foreground"><SatelliteDish className="h-7 w-7" /></span>
         <div>
           <p className="font-semibold">{t('tracking.notActive')}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{t('tracking.notActiveHint')}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{canManage ? t('tracking.notActiveHint') : t('tracking.notActiveHintPm')}</p>
         </div>
-        <Button asChild><Link to="/tracking/subscription"><Satellite className="h-4 w-4" />{t('tracking.goSubscription')}</Link></Button>
+        {canManage && <Button asChild><Link to="/tracking/subscription"><Satellite className="h-4 w-4" />{t('tracking.goSubscription')}</Link></Button>}
       </CardContent>
     </Card>
   );

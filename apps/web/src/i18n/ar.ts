@@ -365,6 +365,7 @@ export const ar: TranslationShape = {
     subscriptionPageTitle: 'الاشتراك والربط',
     subscriptionPageSubtitle: 'فعّل أو مدّد إضافة التتبّع واطلب الربط مع «وصل».',
     notActiveHint: 'فعّل إضافة التتبّع من صفحة الاشتراك لبدء تتبّع مركباتك.',
+    notActiveHintPm: 'تتبّع المركبات غير مفعّل بعد. يرجى الطلب من أدمن الشركة تفعيله.',
     goSubscription: 'الذهاب إلى الاشتراك',
     buyNoPermission: 'لا تملك صلاحية شراء إضافة التتبّع. تواصل مع مسؤول النظام.',
     viewMap: 'الخريطة الحيّة',

@@ -89,9 +89,9 @@ export default function App() {
         <Route path="acquisition" element={<RequirePermission perm="acquisition.read"><AcquisitionPage /></RequirePermission>} />
         <Route path="drivers" element={<RequirePermission perm="drivers.read"><DriversPage /></RequirePermission>} />
         <Route path="tracking" element={<RequirePermission perm="assets.read"><TrackingMapPage /></RequirePermission>} />
-        <Route path="tracking/devices" element={<RequirePermission perm="assets.read"><TrackingDevicesPage /></RequirePermission>} />
+        <Route path="tracking/devices" element={<RequirePermission perm="billing.manage"><TrackingDevicesPage /></RequirePermission>} />
         <Route path="tracking/geofences" element={<RequirePermission perm="assets.read"><TrackingGeofencesPage /></RequirePermission>} />
-        <Route path="tracking/subscription" element={<RequirePermission perm="assets.read"><TrackingSubscriptionPage /></RequirePermission>} />
+        <Route path="tracking/subscription" element={<RequirePermission perm="billing.manage"><TrackingSubscriptionPage /></RequirePermission>} />
         <Route path="alerts" element={<RequirePermission perm="kpis.read"><AlertsPage /></RequirePermission>} />
         <Route path="org-units" element={<RequirePermission perm="org_units.read"><OrgUnitsPage /></RequirePermission>} />
         <Route path="asset-types" element={<RequirePermission perm="asset_types.manage"><AssetTypesPage /></RequirePermission>} />

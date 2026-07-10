@@ -468,17 +468,33 @@ async function onboard(opts: { devDefaults?: boolean } = {}) {
   console.log(`Onboarded "${name}" · ${tenant.code}. Admin login: ${adminEmail}`);
 }
 
+/**
+ * Re-sync every tenant's roles to the current ROLES template (permissions only).
+ * Idempotent via provisionTenantRoles (clears + re-creates RolePermission rows).
+ * WARNING: overwrites any per-role permission tweaks a company admin made in the UI.
+ */
+async function resyncRoles() {
+  console.log('Re-syncing tenant roles to the current template …');
+  const tenants = await prisma.tenant.findMany({ select: { id: true, slug: true } });
+  for (const t of tenants) {
+    await provisionTenantRoles(prisma, t.id);
+    console.log(`  ✓ ${t.slug}: roles re-synced`);
+  }
+  console.log(`Roles re-sync complete (${tenants.length} tenant(s)).`);
+}
+
 async function main() {
   const mode = (process.env.SEED_MODE ?? 'bootstrap').toLowerCase();
   if (mode === 'bootstrap') return bootstrap();
   if (mode === 'onboard') return onboard();
+  if (mode === 'resync-roles') return resyncRoles();
   if (mode === 'full') {
     // Local-dev convenience: platform + a fully-populated demo subscriber.
     await bootstrap();
     await onboard({ devDefaults: true });
     return;
   }
-  throw new Error(`Unknown SEED_MODE "${mode}" (expected: bootstrap | onboard | full)`);
+  throw new Error(`Unknown SEED_MODE "${mode}" (expected: bootstrap | onboard | resync-roles | full)`);
 }
 
 main().catch((e) => { console.error(e); process.exit(1); }).finally(() => prisma.$disconnect());

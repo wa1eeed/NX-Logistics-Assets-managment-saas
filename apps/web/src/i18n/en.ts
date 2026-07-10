@@ -363,6 +363,7 @@ export const en = {
     subscriptionPageTitle: 'Subscription & integration',
     subscriptionPageSubtitle: 'Activate or extend the tracking add-on and request the WASL integration.',
     notActiveHint: 'Activate the tracking add-on from the Subscription page to start tracking your vehicles.',
+    notActiveHintPm: 'Vehicle tracking is not active yet. Please ask your company admin to enable it.',
     goSubscription: 'Go to subscription',
     buyNoPermission: 'You do not have permission to purchase the tracking add-on. Contact your administrator.',
     viewMap: 'Live map',

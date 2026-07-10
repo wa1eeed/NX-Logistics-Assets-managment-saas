@@ -86,6 +86,8 @@ export const ROLES: RoleDef[] = [
     permissions: [
       'assets.read', 'asset_types.read',
       'rentals.read', 'rentals.request', 'rentals.extend', 'rentals.return',
+      // Assign a driver to a project vehicle before it operates.
+      'drivers.read', 'drivers.manage',
       'documents.read',
     ],
   },
