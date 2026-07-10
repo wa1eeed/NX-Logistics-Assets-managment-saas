@@ -427,6 +427,8 @@ export const ar: TranslationShape = {
     keyMissing: 'لا يوجد مفتاح',
     keyKeep: 'اتركه فارغاً للإبقاء عليه',
     docsHint: 'أنشئ مفتاح متصفّح في Google Cloud ← Maps JavaScript API (وفعّل مكتبة Drawing).',
+    routingKey: 'مفتاح OpenRouteService (المسارات)',
+    routingHint: 'مفتاح مجاني من openrouteservice.org ← يشغّل الاتجاهات ومسار رحلة المركبة وتحسين المسارات. يُستخدم من الخادم فقط.',
     saved: 'حُفظت إعدادات الخرائط',
   },
   wasl: {

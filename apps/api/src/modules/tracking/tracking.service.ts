@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type {
-  ConsoleVehicle, ConsoleTask, GeofenceDto, GeofenceEventDto, TrackedAssetDto, TrackingConsole, TrackingDeviceDto, TrackingProvider, TrackingStatusDto,
+  AssetTrail, ConsoleVehicle, ConsoleTask, GeofenceDto, GeofenceEventDto, TrackedAssetDto, TrackingConsole, TrackingDeviceDto, TrackingProvider, TrackingStatusDto,
 } from '@nx-lam/shared';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -250,6 +250,20 @@ export class TrackingService {
     this.requireTenant();
     await this.prisma.geofence.deleteMany({ where: { id } });
     return { id };
+  }
+
+  /** The path a vehicle actually travelled — its location pings over the last N hours. */
+  async assetTrail(assetId: string, hours = 24): Promise<AssetTrail> {
+    this.requireTenant();
+    const windowH = Math.min(Math.max(hours, 1), 168);
+    const since = new Date(Date.now() - windowH * 60 * 60 * 1000);
+    const pings = await this.prisma.locationPing.findMany({
+      where: { assetId, recordedAt: { gte: since } },
+      orderBy: { recordedAt: 'asc' },
+      select: { lat: true, lng: true, recordedAt: true },
+      take: 2000,
+    });
+    return { assetId, points: pings.map((p) => ({ lat: p.lat, lng: p.lng, at: p.recordedAt.toISOString() })) };
   }
 
   /** Recent enter/exit events (newest first), enriched with asset code + zone name. */

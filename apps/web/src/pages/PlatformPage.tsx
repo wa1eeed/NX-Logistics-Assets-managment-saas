@@ -417,16 +417,22 @@ function PlatformMapsCard() {
   const q = useQuery({ queryKey: ['maps-config'], queryFn: async () => (await api.get<MapsGatewaySettings>('/maps/config')).data });
   const [enabled, setEnabled] = useState(false);
   const [apiKey, setApiKey] = useState('');
+  const [routingApiKey, setRoutingApiKey] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
-  // hydrate once (the key is never returned — left blank)
+  // hydrate once (keys are never returned — left blank)
   if (q.data && !loaded) { setEnabled(q.data.enabled); setLoaded(true); }
 
   const save = useMutation({
-    mutationFn: () => api.put<MapsGatewaySettings>('/maps/config', { enabled, ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}) }),
+    mutationFn: () => api.put<MapsGatewaySettings>('/maps/config', {
+      enabled,
+      ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
+      ...(routingApiKey.trim() ? { routingApiKey: routingApiKey.trim() } : {}),
+    }),
     onSuccess: () => {
       setApiKey('');
+      setRoutingApiKey('');
       setMsg({ ok: true, text: t('maps.saved') });
       void qc.invalidateQueries({ queryKey: ['maps-config'] });
       void qc.invalidateQueries({ queryKey: ['maps-runtime'] });
@@ -461,6 +467,17 @@ function PlatformMapsCard() {
           <Input dir="ltr" type="password" placeholder={q.data?.apiKeySet ? '••••••••  ' + t('maps.keyKeep') : 'AIza…'} value={apiKey} onChange={(e) => setApiKey(e.target.value)} />
         </div>
         <p className="text-xs text-muted-foreground">{t('maps.docsHint')}</p>
+
+        <div className="space-y-1.5 border-t pt-4">
+          <Label className="flex items-center gap-2">{t('maps.routingKey')}
+            {q.data && (q.data.routingKeySet
+              ? <Badge variant="outline" className="gap-1"><CheckCircle2 className="h-3 w-3 text-success" />{t('maps.keySet')}</Badge>
+              : <Badge variant="outline" className="gap-1"><XCircle className="h-3 w-3 text-muted-foreground" />{t('maps.keyMissing')}</Badge>)}
+          </Label>
+          <Input dir="ltr" type="password" placeholder={q.data?.routingKeySet ? '••••••••  ' + t('maps.keyKeep') : '5b3ce…'} value={routingApiKey} onChange={(e) => setRoutingApiKey(e.target.value)} />
+          <p className="text-xs text-muted-foreground">{t('maps.routingHint')}</p>
+        </div>
+
         <Button onClick={() => { setMsg(null); save.mutate(); }} disabled={save.isPending}>{save.isPending ? t('common.saving') : t('common.save')}</Button>
       </CardContent>
     </Card>

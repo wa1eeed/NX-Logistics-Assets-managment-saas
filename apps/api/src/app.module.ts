@@ -35,6 +35,7 @@ import { TenantModule } from './modules/tenant/tenant.module';
 import { PreventiveModule } from './modules/preventive/preventive.module';
 import { PublicModule } from './modules/public/public.module';
 import { MapsModule } from './modules/maps/maps.module';
+import { RoutingModule } from './modules/routing/routing.module';
 
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { PermissionsGuard } from './common/guards/permissions.guard';
@@ -83,6 +84,7 @@ import { HealthController } from './health.controller';
     PreventiveModule,
     PublicModule,
     MapsModule,
+    RoutingModule,
   ],
   controllers: [HealthController],
   providers: [

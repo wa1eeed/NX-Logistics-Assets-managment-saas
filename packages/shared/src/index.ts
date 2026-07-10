@@ -7,6 +7,7 @@ export * from './payments';
 export * from './invoice';
 export * from './tracking';
 export * from './maps';
+export * from './routing';
 export * from './integrations-request';
 export * from './storage';
 export * from './platform';

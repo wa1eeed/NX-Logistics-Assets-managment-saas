@@ -9,4 +9,9 @@ export class UpdateMapsDto {
   @IsString()
   @MaxLength(200)
   apiKey?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  routingApiKey?: string;
 }

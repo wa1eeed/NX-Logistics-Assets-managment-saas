@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Post } from '@nestjs/common';
-import type { GeofenceDto, GeofenceEventDto, TrackedAssetDto, TrackingConsole, TrackingDeviceDto, TrackingStatusDto } from '@nx-lam/shared';
+import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Post, Query } from '@nestjs/common';
+import type { AssetTrail, GeofenceDto, GeofenceEventDto, TrackedAssetDto, TrackingConsole, TrackingDeviceDto, TrackingStatusDto } from '@nx-lam/shared';
 import { Public } from '../../common/decorators/public.decorator';
 import { RequirePermissions } from '../../common/decorators/require-permissions.decorator';
 import { AuditEntity } from '../../common/decorators/audit.decorator';
@@ -78,6 +78,12 @@ export class TrackingController {
   @RequirePermissions('assets.read')
   geofenceEvents(): Promise<GeofenceEventDto[]> {
     return this.tracking.listGeofenceEvents();
+  }
+
+  @Get('assets/:id/trail')
+  @RequirePermissions('assets.read')
+  assetTrail(@Param('id') id: string, @Query('hours') hours?: string): Promise<AssetTrail> {
+    return this.tracking.assetTrail(id, hours ? Number(hours) : 24);
   }
 
   /** Public hardware ingest — authenticated per-device by HMAC (x-signature header). */

@@ -425,6 +425,8 @@ export const en = {
     keyMissing: 'No key set',
     keyKeep: 'leave blank to keep',
     docsHint: 'Create a browser key in Google Cloud → Maps JavaScript API (enable the Drawing library).',
+    routingKey: 'OpenRouteService key (routing)',
+    routingHint: 'Free key from openrouteservice.org → powers directions, vehicle trip paths and route optimization. Used server-side only.',
     saved: 'Maps settings saved',
   },
   wasl: {
