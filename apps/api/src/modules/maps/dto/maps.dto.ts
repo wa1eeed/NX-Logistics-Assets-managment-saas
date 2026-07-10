@@ -1,9 +1,14 @@
-import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import type { MapProviderId } from '@nx-lam/shared';
 
 export class UpdateMapsDto {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
+
+  @IsOptional()
+  @IsIn(['auto', 'google', 'osm'])
+  provider?: MapProviderId;
 
   @IsOptional()
   @IsString()

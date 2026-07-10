@@ -5,7 +5,7 @@ import { Building2, Plus, Pause, Play, SlidersHorizontal, LogIn, Users, HardDriv
 import {
   MODULE_LABELS, PLATFORM_MODULES, INTEGRATION_STATUSES, type PlatformModule,
   type LoginResponse, type PaymentGatewaySettings, type PlanDto, type InvoiceSeller, type IntegrationRequestDto, type IntegrationStatus,
-  type PlatformAuditItem, type PlatformOverview, type PlatformTenantSummary, type MapsGatewaySettings,
+  type PlatformAuditItem, type PlatformOverview, type PlatformTenantSummary, type MapsGatewaySettings, type MapProviderId,
 } from '@nx-lam/shared';
 import { api, extractApiError, tokenStore, LIVE_REFETCH_MS } from '../lib/api';
 import { useAuth } from '../auth/AuthContext';
@@ -416,17 +416,19 @@ function PlatformMapsCard() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['maps-config'], queryFn: async () => (await api.get<MapsGatewaySettings>('/maps/config')).data });
   const [enabled, setEnabled] = useState(false);
+  const [provider, setProvider] = useState<MapProviderId>('auto');
   const [apiKey, setApiKey] = useState('');
   const [routingApiKey, setRoutingApiKey] = useState('');
   const [loaded, setLoaded] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   // hydrate once (keys are never returned — left blank)
-  if (q.data && !loaded) { setEnabled(q.data.enabled); setLoaded(true); }
+  if (q.data && !loaded) { setEnabled(q.data.enabled); setProvider(q.data.provider); setLoaded(true); }
 
   const save = useMutation({
     mutationFn: () => api.put<MapsGatewaySettings>('/maps/config', {
       enabled,
+      provider,
       ...(apiKey.trim() ? { apiKey: apiKey.trim() } : {}),
       ...(routingApiKey.trim() ? { routingApiKey: routingApiKey.trim() } : {}),
     }),
@@ -462,6 +464,16 @@ function PlatformMapsCard() {
           <span>{t('maps.enabled')}</span>
           <span className="text-xs text-muted-foreground">— {t('maps.enabledHint')}</span>
         </label>
+        <div className="space-y-1.5">
+          <Label>{t('maps.provider')}</Label>
+          <select className="w-full max-w-[260px] rounded-md border bg-background px-2 py-1.5 text-sm" value={provider} onChange={(e) => setProvider(e.target.value as MapProviderId)}>
+            <option value="auto">{t('maps.providerAuto')}</option>
+            <option value="google">{t('maps.providerGoogle')}</option>
+            <option value="osm">{t('maps.providerOsm')}</option>
+          </select>
+          <p className="text-xs text-muted-foreground">{t('maps.providerHint')}</p>
+        </div>
+
         <div className="space-y-1.5">
           <Label>{t('maps.apiKey')}</Label>
           <Input dir="ltr" type="password" placeholder={q.data?.apiKeySet ? '••••••••  ' + t('maps.keyKeep') : 'AIza…'} value={apiKey} onChange={(e) => setApiKey(e.target.value)} />

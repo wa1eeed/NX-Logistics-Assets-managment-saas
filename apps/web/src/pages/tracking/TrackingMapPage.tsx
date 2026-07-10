@@ -4,9 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft, ChevronRight, Building2, Clock, Truck, User, Package, MapPin } from 'lucide-react';
 import type { ConsoleVehicle, ConsoleTask, TrackingConsole, LookupItem, VehicleStatus, GeofenceDto } from '@nx-lam/shared';
-import { ConsoleMap } from '../../components/ConsoleMap';
-import { ConsoleGoogleMap } from '../../components/maps/ConsoleGoogleMap';
-import { useMapsKey } from '../../lib/maps';
+import { MapView } from '../../components/maps/MapView';
 import { api, LIVE_REFETCH_MS } from '../../lib/api';
 import { cn } from '../../lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
@@ -28,7 +26,6 @@ export function TrackingMapPage() {
   const statusQ = useTrackingStatus();
   const consoleQ = useQuery({ queryKey: ['tracking-console'], queryFn: async () => (await api.get<TrackingConsole>('/tracking/console')).data, refetchInterval: LIVE_REFETCH_MS, enabled: !!statusQ.data?.enabled });
   const regionsQ = useQuery({ queryKey: ['lookups', 'REGION'], queryFn: async () => (await api.get<LookupItem[]>('/lookups', { params: { type: 'REGION' } })).data, staleTime: 60_000 });
-  const { apiKey } = useMapsKey();
   const fencesQ = useQuery({ queryKey: ['geofences'], queryFn: async () => (await api.get<GeofenceDto[]>('/tracking/geofences')).data, enabled: !!statusQ.data?.enabled });
 
   // Routing overlay (directions / trail / optimize).
@@ -65,9 +62,7 @@ export function TrackingMapPage() {
     // Full-bleed: cancel <main> padding and fill the viewport below the 64px header.
     <div className="relative -m-4 h-[calc(100vh-4rem)] overflow-hidden sm:-m-6">
       <div className="absolute inset-0">
-        {apiKey
-          ? <ConsoleGoogleMap apiKey={apiKey} vehicles={cityVehicles} tasks={cityTasks} fences={fencesQ.data ?? []} focus={mapFocus} route={routeGeo ?? undefined} waypoints={routePicking ? routeWaypoints : undefined} onMapClick={onMapClick} />
-          : <ConsoleMap vehicles={cityVehicles} tasks={cityTasks} fences={fencesQ.data ?? []} focus={mapFocus} route={routeGeo ?? undefined} waypoints={routePicking ? routeWaypoints : undefined} onMapClick={onMapClick} />}
+        <MapView vehicles={cityVehicles} tasks={cityTasks} fences={fencesQ.data ?? []} focus={mapFocus} route={routeGeo ?? undefined} waypoints={routePicking ? routeWaypoints : undefined} onMapClick={onMapClick} />
       </div>
 
       {st?.enabled && (

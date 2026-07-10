@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { GeofenceDto, MapsRuntime } from '@nx-lam/shared';
+import type { GeofenceDto, MapProviderId, MapsRuntime } from '@nx-lam/shared';
 import { api } from './api';
 
 // ---- Google Maps runtime health: fall back to Leaflet if the key is rejected ----
@@ -32,7 +32,7 @@ export const GOOGLE_MAPS_LIBRARIES: ('drawing' | 'geometry')[] = ['drawing', 'ge
  * The platform-configured Google Maps key. `apiKey === null` means maps aren't set
  * up (or disabled) → callers fall back to Leaflet/OSM. Cached for 5 minutes.
  */
-export function useMapsKey(): { apiKey: string | null; loading: boolean } {
+export function useMapsKey(): { apiKey: string | null; provider: MapProviderId; loading: boolean } {
   const q = useQuery({
     queryKey: ['maps-runtime'],
     queryFn: async () => (await api.get<MapsRuntime>('/maps/runtime')).data,
@@ -46,7 +46,11 @@ export function useMapsKey(): { apiKey: string | null; loading: boolean } {
     failListeners.add(fn);
     return () => { failListeners.delete(fn); };
   }, []);
-  return { apiKey: failed ? null : q.data?.apiKey ?? null, loading: q.isLoading };
+  return {
+    apiKey: failed ? null : q.data?.apiKey ?? null,
+    provider: q.data?.provider ?? 'auto',
+    loading: q.isLoading,
+  };
 }
 
 // ---- geofence geo (our stored JSON) <-> lat/lng helpers ----

@@ -10,6 +10,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { GeofenceEditor } from '../../components/maps/GeofenceEditor';
+import { useActiveMapProvider } from '../../components/maps/MapView';
 import { Flash, GeofenceCard, TrackingDisabledNotice, useTrackingStatus } from './cards';
 
 function GeofenceEventsCard() {
@@ -55,6 +56,7 @@ export function TrackingGeofencesPage() {
   const enabled = !!statusQ.data?.enabled;
   const fencesQ = useQuery({ queryKey: ['geofences'], queryFn: async () => (await api.get<GeofenceDto[]>('/tracking/geofences')).data, enabled });
   const { apiKey } = useMapsKey();
+  const provider = useActiveMapProvider();
 
   const invalidate = () => void qc.invalidateQueries({ queryKey: ['geofences'] });
   const onErr = (e: unknown) => setMsg({ ok: false, text: extractApiError(e) });
@@ -68,7 +70,7 @@ export function TrackingGeofencesPage() {
 
       {enabled && (
         <>
-          {apiKey ? (
+          {apiKey && provider.id === 'google' ? (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base"><MapPin className="h-4 w-4 text-primary" />{t('tracking.geofences')}</CardTitle>

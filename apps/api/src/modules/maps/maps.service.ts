@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   MAPS_SETTING_KEY,
+  type MapProviderId,
   type MapsGatewaySettings,
   type MapsRuntime,
   type UpdateMapsGatewayDto,
@@ -11,6 +12,7 @@ interface StoredMapsConfig {
   enabled: boolean;
   apiKey: string | null;
   routingApiKey: string | null;
+  provider: MapProviderId;
 }
 
 /**
@@ -34,13 +36,14 @@ export class MapsService {
     const routingApiKey = (v.routingApiKey ?? process.env.OPENROUTESERVICE_API_KEY?.trim() ?? null) || null;
     // Honor an explicit DB flag; otherwise default to enabled whenever a key exists.
     const enabled = v.enabled ?? !!apiKey;
-    return { enabled, apiKey, routingApiKey };
+    const provider: MapProviderId = v.provider ?? 'auto';
+    return { enabled, apiKey, routingApiKey, provider };
   }
 
   /** Admin view — key values are masked (only whether each is set). */
   async getSettings(): Promise<MapsGatewaySettings> {
     const c = await this.raw();
-    return { enabled: c.enabled, apiKeySet: !!c.apiKey, routingKeySet: !!c.routingApiKey };
+    return { enabled: c.enabled, apiKeySet: !!c.apiKey, routingKeySet: !!c.routingApiKey, provider: c.provider };
   }
 
   /** Upsert the config. An empty/omitted key keeps the stored one. */
@@ -50,20 +53,23 @@ export class MapsService {
       enabled: dto.enabled ?? current.enabled,
       apiKey: dto.apiKey?.trim() ? dto.apiKey.trim() : current.apiKey,
       routingApiKey: dto.routingApiKey?.trim() ? dto.routingApiKey.trim() : current.routingApiKey,
+      provider: dto.provider ?? current.provider,
     };
     await this.prisma.platformSetting.upsert({
       where: { key: MAPS_SETTING_KEY },
       create: { key: MAPS_SETTING_KEY, value: next as object },
       update: { value: next as object },
     });
-    this.logger.log(`Maps provider updated (enabled=${next.enabled}, mapsKey=${!!next.apiKey}, routingKey=${!!next.routingApiKey})`);
-    return { enabled: next.enabled, apiKeySet: !!next.apiKey, routingKeySet: !!next.routingApiKey };
+    this.logger.log(`Maps provider updated (provider=${next.provider}, enabled=${next.enabled}, mapsKey=${!!next.apiKey}, routingKey=${!!next.routingApiKey})`);
+    return { enabled: next.enabled, apiKeySet: !!next.apiKey, routingKeySet: !!next.routingApiKey, provider: next.provider };
   }
 
-  /** What the web needs to boot Google Maps — key only when enabled AND set. */
+  /** What the web needs at runtime — the Google key (when usable) + the chosen provider. */
   async runtime(): Promise<MapsRuntime> {
     const c = await this.raw();
-    return { apiKey: c.enabled && c.apiKey ? c.apiKey : null };
+    // 'osm' forces the free layer → don't hand out the key.
+    const apiKey = c.provider !== 'osm' && c.enabled && c.apiKey ? c.apiKey : null;
+    return { apiKey, provider: c.provider };
   }
 
   /** Server-side ORS routing key (never sent to the browser). */
